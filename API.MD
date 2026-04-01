@@ -358,6 +358,9 @@ Token-efficient, minimal-shape endpoints for development loops:
 - `POST /api/compact/test/map`
 - `POST /api/compact/session/plan`
 - `GET /api/compact/session/plan?sessionId=...`
+- `POST /api/compact/js/check`
+- `POST /api/compact/dev/serve`
+- `POST /api/compact/dev/serve/stop`
 - `POST /api/compact/quality/guard`
 - `POST /api/compact/semantic-search`
 - `POST /api/compact/refactor/rename-plan`
@@ -462,6 +465,15 @@ Finds tests and related test files for a query or seed.
 
 ### `POST/GET /api/compact/session/plan`
 Lightweight in-memory session plan store (`sessionId`, `goal`, `state`, `steps[]`).
+
+### `POST /api/compact/js/check`
+Syntax-checks JavaScript files via `node --check` (single file, directory, or whole project).
+
+### `POST /api/compact/dev/serve`
+Starts a lightweight static server for a project path and returns URL/process metadata.
+
+### `POST /api/compact/dev/serve/stop`
+Stops a running dev server by `serverId`.
 
 ### `POST /api/compact/quality/guard`
 Returns quick guardrails/warnings for retrieval workflow setup.

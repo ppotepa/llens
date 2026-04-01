@@ -33,6 +33,7 @@ builder.Services.AddSingleton<ICodeMapCache, InMemoryCodeMapCache>(); // swap to
 builder.Services.AddSingleton<ICodeIndexer, CodeIndexer>();
 builder.Services.AddSingleton<QueryTelemetry>();
 builder.Services.AddSingleton<CompactSessionStore>();
+builder.Services.AddSingleton<CompactDevServerStore>();
 builder.Services.AddHostedService<RepoWatcherService>();
 
 var app = builder.Build();

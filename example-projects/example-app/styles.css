@@ -5,6 +5,7 @@
   --text: #17233a;
   --muted: #596b8a;
   --accent: #0f766e;
+  --soft: #eff5f3;
 }
 
 * { box-sizing: border-box; }
@@ -26,7 +27,7 @@ body {
 
 .layout {
   display: grid;
-  grid-template-columns: 240px 1fr 300px;
+  grid-template-columns: 260px 1fr 320px;
   gap: 12px;
   padding: 12px;
 }
@@ -37,18 +38,31 @@ body {
   padding: 12px;
 }
 .grow { min-height: 70vh; }
+.stack { display: grid; gap: 14px; align-content: start; }
+.row { display: flex; }
+.gap { gap: 8px; }
 
 .toolbar {
   display: grid;
   grid-template-columns: 1fr 180px;
   gap: 8px;
-  margin-bottom: 10px;
 }
 input, select, button {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px;
   font: inherit;
+}
+
+.form-grid {
+  display: grid;
+  gap: 8px;
+}
+.form-grid.two-col {
+  grid-template-columns: 1fr 1fr;
+}
+.form-grid.two-col button {
+  grid-column: 1 / -1;
 }
 
 .list {
@@ -83,6 +97,7 @@ input, select, button {
   font-weight: 700;
   margin-bottom: 8px;
 }
+
 button {
   background: var(--accent);
   color: white;
@@ -92,11 +107,31 @@ button:disabled {
   opacity: 0.5;
   cursor: default;
 }
+button.soft {
+  background: var(--soft);
+  color: var(--text);
+}
+
+.cart-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.qty {
+  display: inline-flex;
+  gap: 4px;
+}
+.qty button {
+  padding: 4px 8px;
+}
+
 .total {
-  margin-top: 10px;
+  margin: 0;
   font-weight: 700;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1080px) {
   .layout { grid-template-columns: 1fr; }
+  .form-grid.two-col { grid-template-columns: 1fr; }
 }

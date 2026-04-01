@@ -550,6 +550,123 @@ public static class CompactOpsEndpoints
             return Results.Ok(store.Get(sessionId));
         });
 
+        g.MapPost("/js/check", async (
+            CompactJsCheckRequest request,
+            ProjectRegistry projects,
+            CancellationToken ct) =>
+        {
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+
+            var root = project!.Config.ResolvedPath;
+            var maxFiles = Math.Clamp(request.MaxFiles <= 0 ? 120 : request.MaxFiles, 1, 2000);
+            var timeoutMs = Math.Clamp(request.TimeoutMs <= 0 ? 12000 : request.TimeoutMs, 1000, 120000);
+            List<string> files;
+
+            if (!string.IsNullOrWhiteSpace(request.Path))
+            {
+                var full = EnsureWithinProject(root, request.Path!);
+                if (full is null) return Results.BadRequest("Path is outside project root.");
+                if (File.Exists(full))
+                {
+                    files = IsJavaScriptFile(full) ? [full] : [];
+                }
+                else if (Directory.Exists(full))
+                {
+                    files = EnumerateJavaScriptFiles(full, project.Config, maxFiles);
+                }
+                else
+                {
+                    return Results.NotFound("Path not found.");
+                }
+            }
+            else
+            {
+                files = EnumerateJavaScriptFiles(root, project.Config, maxFiles);
+            }
+
+            var issues = new List<CompactJsCheckIssue>();
+            foreach (var file in files)
+            {
+                try
+                {
+                    var result = await RunProcessAsync("node", $"--check {QuoteArg(file)}", root, timeoutMs, ct);
+                    if (result.ExitCode == 0) continue;
+                    var msg = (string.IsNullOrWhiteSpace(result.Stderr) ? result.Stdout : result.Stderr).Trim();
+                    issues.Add(new CompactJsCheckIssue(file, result.ExitCode, Truncate(msg, 1200)));
+                }
+                catch (Exception ex)
+                {
+                    return Results.BadRequest($"node runtime is not available: {ex.Message}");
+                }
+            }
+
+            return Results.Ok(new CompactJsCheckResponse(project.Name, files.Count, issues.Count == 0, issues));
+        });
+
+        g.MapPost("/dev/serve", (
+            CompactDevServeRequest request,
+            ProjectRegistry projects,
+            CompactDevServerStore servers) =>
+        {
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+
+            var root = project!.Config.ResolvedPath;
+            var dirPath = string.IsNullOrWhiteSpace(request.Path) ? root : EnsureWithinProject(root, request.Path!);
+            if (dirPath is null) return Results.BadRequest("Path is outside project root.");
+            if (!Directory.Exists(dirPath)) return Results.NotFound("Directory not found.");
+
+            var host = string.IsNullOrWhiteSpace(request.Host) ? "127.0.0.1" : request.Host!.Trim();
+            var port = Math.Clamp(request.Port <= 0 ? 5173 : request.Port, 1024, 65535);
+            var serverId = string.IsNullOrWhiteSpace(request.ServerId)
+                ? $"{project.Name}:{Path.GetRelativePath(root, dirPath)}:{host}:{port}"
+                : request.ServerId.Trim();
+
+            if (servers.TryGet(serverId, out var existing) && !existing.Process.HasExited)
+            {
+                if (request.ReuseIfRunning)
+                    return Results.Ok(new CompactDevServeResponse(project.Name, serverId, true, existing.Process.Id, existing.Command, $"http://{host}:{port}/", false));
+
+                servers.Stop(serverId);
+            }
+
+            Process process;
+            string command;
+            try
+            {
+                (process, command) = StartPythonServer(dirPath, host, port, preferPython3: true);
+            }
+            catch
+            {
+                try
+                {
+                    (process, command) = StartPythonServer(dirPath, host, port, preferPython3: false);
+                }
+                catch (Exception ex)
+                {
+                    return Results.BadRequest($"Failed to start static server: {ex.Message}");
+                }
+            }
+
+            var info = new CompactDevServerInfo(serverId, project.Name, dirPath, host, port, command, process);
+            servers.Set(serverId, info);
+            process.EnableRaisingEvents = true;
+            process.Exited += (_, _) => servers.Remove(serverId);
+
+            return Results.Ok(new CompactDevServeResponse(project.Name, serverId, true, process.Id, command, $"http://{host}:{port}/", true));
+        });
+
+        g.MapPost("/dev/serve/stop", (
+            CompactDevServeStopRequest request,
+            CompactDevServerStore servers) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.ServerId))
+                return Results.BadRequest("'serverId' is required.");
+            var stopped = servers.Stop(request.ServerId);
+            return Results.Ok(new CompactDevServeStopResponse(request.ServerId, stopped));
+        });
+
         g.MapPost("/quality/guard", async (
             CompactQualityGuardRequest request,
             ProjectRegistry projects,
@@ -675,6 +792,9 @@ public static class CompactOpsEndpoints
                 "/api/compact/diagnostics",
                 "/api/compact/test/map",
                 "/api/compact/session/plan",
+                "/api/compact/js/check",
+                "/api/compact/dev/serve",
+                "/api/compact/dev/serve/stop",
                 "/api/compact/quality/guard",
                 "/api/compact/semantic-search",
                 "/api/compact/refactor/rename-plan",
@@ -803,8 +923,12 @@ public static class CompactOpsEndpoints
     private static string? EnsureWithinProject(string projectRoot, string inputPath)
     {
         var full = Path.GetFullPath(Path.IsPathRooted(inputPath) ? inputPath : Path.Combine(projectRoot, inputPath));
-        var root = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) ? full : null;
+        var rootBase = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar);
+        var rootPrefix = rootBase + Path.DirectorySeparatorChar;
+        return full.Equals(rootBase, StringComparison.OrdinalIgnoreCase)
+            || full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)
+            ? full
+            : null;
     }
 
     private static async Task<FileNode?> ResolveIndexedFileNodeAsync(ICodeMapCache cache, Project project, string seedPath, CancellationToken ct)
@@ -931,6 +1055,47 @@ public static class CompactOpsEndpoints
         if (string.IsNullOrWhiteSpace(value)) return "\"\"";
         if (value.IndexOfAny([' ', '\t', '\n', '\r', '"']) < 0) return value;
         return "\"" + value.Replace("\"", "\\\"") + "\"";
+    }
+
+    private static (Process Process, string Command) StartPythonServer(string cwd, string host, int port, bool preferPython3)
+    {
+        var file = preferPython3 ? "python3" : "python";
+        var args = $"-m http.server {port} --bind {host}";
+        var p = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = file,
+                Arguments = args,
+                WorkingDirectory = cwd,
+                UseShellExecute = false,
+                RedirectStandardOutput = false,
+                RedirectStandardError = false
+            }
+        };
+        p.Start();
+        return (p, $"{file} {args}");
+    }
+
+    private static bool IsJavaScriptFile(string path)
+    {
+        var ext = Path.GetExtension(path);
+        return ext.Equals(".js", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".mjs", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".cjs", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static List<string> EnumerateJavaScriptFiles(string root, RepoConfig config, int maxFiles)
+    {
+        var results = new List<string>(capacity: Math.Min(maxFiles, 512));
+        foreach (var file in Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories))
+        {
+            if (results.Count >= maxFiles) break;
+            if (ShouldExclude(config, file)) continue;
+            if (!IsJavaScriptFile(file)) continue;
+            results.Add(file);
+        }
+        return results;
     }
 
     private static string NormalizeGitMode(string? mode)
@@ -1262,6 +1427,41 @@ public sealed class CompactSessionStore
     }
 }
 
+public sealed record CompactDevServerInfo(
+    string ServerId,
+    string Project,
+    string Directory,
+    string Host,
+    int Port,
+    string Command,
+    Process Process);
+
+public sealed class CompactDevServerStore
+{
+    private readonly ConcurrentDictionary<string, CompactDevServerInfo> _servers = new(StringComparer.OrdinalIgnoreCase);
+
+    public void Set(string id, CompactDevServerInfo info) => _servers[id] = info;
+
+    public bool TryGet(string id, out CompactDevServerInfo info) => _servers.TryGetValue(id, out info!);
+
+    public bool Remove(string id) => _servers.TryRemove(id, out _);
+
+    public bool Stop(string id)
+    {
+        if (!_servers.TryRemove(id, out var info)) return false;
+        try
+        {
+            if (!info.Process.HasExited)
+                info.Process.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+            return false;
+        }
+        return true;
+    }
+}
+
 public record CompactRegexRequest(string Project, string Pattern, string? PathPrefix = null, bool IgnoreCase = true, bool MultiLine = false, int MaxFiles = 200, int MaxMatches = 250);
 public record CompactRegexMatch(string P, int L, string M);
 public record CompactRegexResponse(string Project, string Pattern, int Count, List<CompactRegexMatch> Matches);
@@ -1393,6 +1593,29 @@ public class CompactQualityGuardRequest
     public string[]? ChangedFiles { get; init; }
 }
 public record CompactQualityGuardResponse(string Project, List<string> Warnings, List<string> Infos);
+
+public class CompactJsCheckRequest
+{
+    public string Project { get; init; } = "";
+    public string? Path { get; init; }
+    public int MaxFiles { get; init; } = 120;
+    public int TimeoutMs { get; init; } = 12000;
+}
+public record CompactJsCheckIssue(string Path, int ExitCode, string Message);
+public record CompactJsCheckResponse(string Project, int CheckedFiles, bool Ok, List<CompactJsCheckIssue> Issues);
+
+public class CompactDevServeRequest
+{
+    public string Project { get; init; } = "";
+    public string? Path { get; init; }
+    public string? Host { get; init; } = "127.0.0.1";
+    public int Port { get; init; } = 5173;
+    public string? ServerId { get; init; }
+    public bool ReuseIfRunning { get; init; } = true;
+}
+public record CompactDevServeResponse(string Project, string ServerId, bool Running, int Pid, string Command, string Url, bool StartedNow);
+public record CompactDevServeStopRequest(string ServerId);
+public record CompactDevServeStopResponse(string ServerId, bool Stopped);
 
 public record CompactSemanticSearchRequest(string Project, string Q, int Limit = 20);
 
