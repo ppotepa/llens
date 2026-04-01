@@ -164,6 +164,28 @@ The long-term goal is a small JSON query language, not a growing pile of unrelat
 
 ## Delivery Phases
 
+## Current Status Snapshot (2026-04-02)
+
+Overall completion estimate: **~82%** toward the current roadmap.
+
+Implemented or mostly implemented:
+- Phase 1 Retrieval MVP: query/resolve/snippet/fuzzy/references are live and used in compact flow.
+- Phase 2 Navigable Graph: graph query/expand/collapse APIs exist with paging/exclude support.
+- Phase 3 Context-Pack Engine: context-pack endpoints (`compact/balanced/detailed`) with budget/confidence/gaps are live.
+- Compact tooling for development loops: fs/git/query/graph/context-pack/js/test/format/lint/typecheck/reindex.
+- CLI + API shared services with compact and tuple output paths.
+- Rust semantic references improved with import-aware candidate ranking.
+
+In progress:
+- Graph UX polish in browser (node expansion ergonomics and interaction polish).
+- Semantic precision depth (callers/implementors edge quality across ambiguous symbols).
+- Retrieval telemetry hardening and benchmark loops.
+
+Remaining to hit 100% against this roadmap:
+- Persistent indexing as default (SQLite startup path, freshness metadata, stale cleanup at scale).
+- Final query-surface unification details and deterministic chaining polish.
+- End-to-end operational hardening/docs for large-repo workflows.
+
 ## Phase 1: Retrieval MVP
 
 Goal: make lookup reliable enough that Llens is already useful in real coding sessions.

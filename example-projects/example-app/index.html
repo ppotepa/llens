@@ -4,69 +4,37 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Example App Store</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles/base.css" />
 </head>
 <body>
   <header class="topbar">
     <h1>Example App Store</h1>
-    <p>Products, categories, cart, and lightweight admin actions.</p>
+    <nav class="nav" aria-label="Main">
+      <a href="./pages/catalog.html">Catalog</a>
+      <a href="./pages/cart.html">Cart</a>
+      <a href="./pages/admin-products.html">Admin Products</a>
+      <a href="./pages/admin-categories.html">Admin Categories</a>
+      <a href="./pages/reports.html">Reports</a>
+    </nav>
   </header>
 
-  <main class="layout">
-    <aside class="panel stack">
-      <section>
-        <h2>Categories</h2>
-        <ul id="category-list" class="list"></ul>
-      </section>
-
-      <section>
-        <h3>Add Category</h3>
-        <form id="category-form" class="form-grid">
-          <input id="category-name" type="text" placeholder="Category name" required />
-          <button type="submit">Create</button>
-        </form>
-      </section>
-    </aside>
-
-    <section class="panel grow stack">
-      <div class="toolbar">
-        <input id="search-input" type="search" placeholder="Search products..." />
-        <select id="sort-select">
-          <option value="name">Sort: Name</option>
-          <option value="price-asc">Sort: Price (Low)</option>
-          <option value="price-desc">Sort: Price (High)</option>
-          <option value="stock">Sort: Stock</option>
-        </select>
-      </div>
-
-      <div id="products-grid" class="grid"></div>
-
-      <section>
-        <h3>Add Product</h3>
-        <form id="product-form" class="form-grid two-col">
-          <input id="product-name" type="text" placeholder="Name" required />
-          <select id="product-category" required></select>
-          <input id="product-price" type="number" min="0" step="0.01" placeholder="Price" required />
-          <input id="product-stock" type="number" min="0" step="1" placeholder="Stock" required />
-          <button type="submit">Add Product</button>
-        </form>
-      </section>
+  <main class="page grid" style="gap:10px">
+    <section class="card">
+      <h2>Start Here</h2>
+      <p class="muted">This root page links to all app modules. Use the links below to open a specific page.</p>
+      <ul class="list">
+        <li><a href="./pages/catalog.html">Open Catalog</a></li>
+        <li><a href="./pages/cart.html">Open Cart</a></li>
+        <li><a href="./pages/admin-products.html">Open Admin Products</a></li>
+        <li><a href="./pages/admin-categories.html">Open Admin Categories</a></li>
+        <li><a href="./pages/reports.html">Open Reports</a></li>
+      </ul>
     </section>
 
-    <aside class="panel stack">
-      <section>
-        <h2>Cart</h2>
-        <ul id="cart-list" class="list"></ul>
-        <p id="cart-total" class="total">Total: $0.00</p>
-      </section>
-
-      <section class="row gap">
-        <button id="clear-cart" class="soft">Clear Cart</button>
-        <button id="seed-demo" class="soft">Reset Demo Data</button>
-      </section>
-    </aside>
+    <section class="card">
+      <h3>Auth Note</h3>
+      <p class="muted">Hardcoded credentials used by subpages: <strong>user / user</strong>.</p>
+    </section>
   </main>
-
-  <script src="./app.js"></script>
 </body>
 </html>

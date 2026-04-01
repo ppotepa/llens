@@ -149,6 +149,9 @@ impl<'ast> Visit<'ast> for Visitor {
             line,
             signature: None,
         });
+        if node.content.is_none() {
+            self.imports.push(node.ident.to_string());
+        }
         syn::visit::visit_item_mod(self, node);
     }
 

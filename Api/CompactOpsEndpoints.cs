@@ -2,8 +2,13 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Llens.Caching;
+using Llens.Application.Fs;
+using Llens.Cli;
+using Llens.Application.JsCheck;
+using Llens.Indexing;
 using Llens.Models;
 using Llens.Observability;
+using Llens.Scanning;
 
 namespace Llens.Api;
 
@@ -127,106 +132,75 @@ public static class CompactOpsEndpoints
 
         g.MapPost("/fs/tree", (
             CompactFsTreeRequest request,
-            ProjectRegistry projects) =>
+            ProjectRegistry projects,
+            ICompactFsService fsService) =>
         {
             var (project, error) = ResolveProject(projects, request.Project);
             if (error is not null) return error;
-
-            var root = project!.Config.ResolvedPath;
-            var maxDepth = Math.Clamp(request.MaxDepth <= 0 ? 3 : request.MaxDepth, 1, 10);
-            var maxEntries = Math.Clamp(request.MaxEntries <= 0 ? 600 : request.MaxEntries, 1, 20000);
-            var entries = new List<CompactFsEntry>();
-
-            Walk(root, 0);
-            return Results.Ok(new CompactFsTreeResponse(project.Name, root, entries.Count, entries));
-
-            void Walk(string dir, int depth)
-            {
-                if (depth > maxDepth || entries.Count >= maxEntries) return;
-                IEnumerable<string> dirs;
-                IEnumerable<string> files;
-                try
-                {
-                    dirs = Directory.EnumerateDirectories(dir);
-                    files = Directory.EnumerateFiles(dir);
-                }
-                catch { return; }
-
-                foreach (var d in dirs)
-                {
-                    if (ShouldExclude(project.Config, d)) continue;
-                    entries.Add(new CompactFsEntry("d", d, depth));
-                    if (entries.Count >= maxEntries) return;
-                    Walk(d, depth + 1);
-                    if (entries.Count >= maxEntries) return;
-                }
-                foreach (var f in files)
-                {
-                    if (ShouldExclude(project.Config, f)) continue;
-                    entries.Add(new CompactFsEntry("f", f, depth));
-                    if (entries.Count >= maxEntries) return;
-                }
-            }
+            var outcome = fsService.Tree(project!, request);
+            return Results.Ok(outcome.Response);
         });
 
         g.MapPost("/fs/read-range", async (
             CompactFsReadRangeRequest request,
             ProjectRegistry projects,
+            ICompactFsService fsService,
             CancellationToken ct) =>
         {
             var (project, error) = ResolveProject(projects, request.Project);
             if (error is not null) return error;
-            if (string.IsNullOrWhiteSpace(request.Path))
-                return Results.BadRequest("'path' is required.");
-
-            var full = EnsureWithinProject(project!.Config.ResolvedPath, request.Path);
-            if (full is null) return Results.BadRequest("Path is outside project root.");
-            if (!File.Exists(full)) return Results.NotFound("File not found.");
-
-            var from = Math.Max(1, request.From <= 0 ? 1 : request.From);
-            var to = Math.Max(from, request.To <= 0 ? from + 50 : request.To);
-            to = Math.Min(to, from + 1000);
-            var lines = await File.ReadAllLinesAsync(full, ct);
-            if (lines.Length == 0) return Results.Ok(new CompactFsReadRangeResponse(full, from, to, []));
-
-            var actualTo = Math.Min(to, lines.Length);
-            var outLines = new List<CompactLine>(capacity: actualTo - from + 1);
-            for (var i = from; i <= actualTo; i++)
-                outLines.Add(new CompactLine(i, lines[i - 1]));
-
-            return Results.Ok(new CompactFsReadRangeResponse(full, from, actualTo, outLines));
+            var outcome = await fsService.ReadRangeAsync(project!, request, ct);
+            if (!outcome.Ok)
+            {
+                return outcome.ErrorKind switch
+                {
+                    FsErrorKind.BadRequest => Results.BadRequest(outcome.ErrorMessage ?? "Invalid request."),
+                    FsErrorKind.NotFound => Results.NotFound(outcome.ErrorMessage ?? "File not found."),
+                    _ => Results.BadRequest(outcome.ErrorMessage ?? "read-range failed.")
+                };
+            }
+            return Results.Ok(outcome.Response);
         });
 
         g.MapPost("/fs/write-file", (
             CompactFsWriteFileRequest request,
-            ProjectRegistry projects) =>
+            ProjectRegistry projects,
+            ICompactFsService fsService) =>
         {
             var (project, error) = ResolveProject(projects, request.Project);
             if (error is not null) return error;
-            if (string.IsNullOrWhiteSpace(request.Path))
-                return Results.BadRequest("'path' is required.");
-
-            var full = EnsureWithinProject(project!.Config.ResolvedPath, request.Path);
-            if (full is null) return Results.BadRequest("Path is outside project root.");
-
-            if (!request.Overwrite && File.Exists(full))
-                return Results.Conflict("File already exists and overwrite=false.");
-
-            var dir = Path.GetDirectoryName(full);
-            if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir))
+            var outcome = fsService.WriteFile(project!, request);
+            if (!outcome.Ok)
             {
-                if (!request.CreateDirs)
-                    return Results.BadRequest("Target directory does not exist and createDirs=false.");
-                Directory.CreateDirectory(dir);
+                return outcome.ErrorKind switch
+                {
+                    FsErrorKind.BadRequest => Results.BadRequest(outcome.ErrorMessage ?? "Invalid request."),
+                    FsErrorKind.Conflict => Results.Conflict(outcome.ErrorMessage ?? "Conflict."),
+                    _ => Results.BadRequest(outcome.ErrorMessage ?? "write-file failed.")
+                };
             }
+            return Results.Ok(outcome.Response);
+        });
 
-            var content = request.Content ?? "";
-            if (request.EnsureTrailingNewline && !content.EndsWith('\n'))
-                content += '\n';
+        g.MapPost("/fs/edit", async (
+            CompactFsEditRequest request,
+            ProjectRegistry projects,
+            ICompactFsService fsService,
+            CancellationToken ct) =>
+        {
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
 
-            File.WriteAllText(full, content);
-            var bytes = new FileInfo(full).Length;
-            return Results.Ok(new CompactFsWriteFileResponse(project.Name, full, content.Length, bytes, File.Exists(full)));
+            var outcome = await fsService.EditAsync(project!, request, ct);
+            if (!outcome.Ok)
+            {
+                return outcome.ErrorKind switch
+                {
+                    FsErrorKind.BadRequest => Results.BadRequest(outcome.ErrorMessage ?? "Invalid request."),
+                    _ => Results.BadRequest(outcome.ErrorMessage ?? "fs/edit failed.")
+                };
+            }
+            return Results.Ok(outcome.Response);
         });
 
         g.MapPost("/fs/write-patch", (
@@ -296,54 +270,21 @@ public static class CompactOpsEndpoints
         g.MapPost("/fs/diff", async (
             CompactFsDiffRequest request,
             ProjectRegistry projects,
+            ICompactFsService fsService,
             CancellationToken ct) =>
         {
             var (project, error) = ResolveProject(projects, request.Project);
             if (error is not null) return error;
-
-            var root = project!.Config.ResolvedPath;
-            var gitRoot = FindGitRoot(root);
-            if (gitRoot is null)
-                return Results.Ok(new CompactFsDiffResponse(project.Name, false, request.Path, request.Staged, 0, ""));
-
-            var args = new List<string> { "-C", gitRoot, "diff" };
-            if (request.Staged) args.Add("--cached");
-            if (!string.IsNullOrWhiteSpace(request.Path))
+            var outcome = await fsService.DiffAsync(project!, request, ct);
+            if (!outcome.Ok)
             {
-                var full = EnsureWithinProject(root, request.Path!);
-                if (full is null) return Results.BadRequest("Path is outside project root.");
-                var rel = Path.GetRelativePath(gitRoot, full);
-                args.Add("--");
-                args.Add(rel);
-            }
-            else
-            {
-                var relProjectRoot = Path.GetRelativePath(gitRoot, root);
-                args.Add("--");
-                args.Add(relProjectRoot);
-            }
-
-            var argLine = string.Join(" ", args.Select(QuoteArg));
-            var result = await RunProcessAsync("git", argLine, gitRoot, Math.Clamp(request.TimeoutMs <= 0 ? 15000 : request.TimeoutMs, 2000, 120000), ct);
-            var text = (result.Stdout ?? "") + (string.IsNullOrWhiteSpace(result.Stderr) ? "" : ("\n" + result.Stderr));
-
-            if (string.IsNullOrWhiteSpace(text) && !string.IsNullOrWhiteSpace(request.Path))
-            {
-                var full = EnsureWithinProject(root, request.Path!);
-                if (full is not null)
+                return outcome.ErrorKind switch
                 {
-                    var rel = Path.GetRelativePath(gitRoot, full);
-                    var status = await RunProcessAsync("git", string.Join(" ", new[] { "-C", gitRoot, "status", "--porcelain", "--", rel }.Select(QuoteArg)), gitRoot, 8000, ct);
-                    var line = (status.Stdout ?? "").Trim();
-                    if (line.StartsWith("??", StringComparison.Ordinal))
-                        text = $"UNTRACKED {rel}";
-                }
+                    FsErrorKind.BadRequest => Results.BadRequest(outcome.ErrorMessage ?? "Invalid request."),
+                    _ => Results.BadRequest(outcome.ErrorMessage ?? "diff failed.")
+                };
             }
-
-            var maxChars = Math.Clamp(request.MaxChars <= 0 ? 24000 : request.MaxChars, 800, 200000);
-            var body = text.Length <= maxChars ? text : text[..maxChars];
-            var lines = body.Length == 0 ? 0 : body.Count(c => c == '\n') + 1;
-            return Results.Ok(new CompactFsDiffResponse(project.Name, true, request.Path, request.Staged, lines, body));
+            return Results.Ok(outcome.Response);
         });
 
         g.MapPost("/git/history", async (
@@ -426,6 +367,30 @@ public static class CompactOpsEndpoints
             var max = Math.Clamp(request.MaxChars <= 0 ? 30000 : request.MaxChars, 1000, 250000);
             if (text.Length > max) text = text[..max];
             return Results.Ok(new CompactGitPatchResponse(proj.Name, true, request.CommitId, request.Path, text));
+        });
+
+        g.MapPost("/git/status", async (
+            CompactGitStatusRequest request,
+            ProjectRegistry projects,
+            ICompactFsService fsService,
+            CancellationToken ct) =>
+        {
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+
+            var outcome = await fsService.GitStatusAsync(project!, request, ct);
+            if (!outcome.Ok)
+            {
+                return outcome.ErrorKind switch
+                {
+                    FsErrorKind.BadRequest => Results.BadRequest(outcome.ErrorMessage ?? "Invalid request."),
+                    _ => Results.BadRequest(outcome.ErrorMessage ?? "git/status failed.")
+                };
+            }
+
+            if (string.Equals(request.Format?.Trim(), "tuple", StringComparison.OrdinalIgnoreCase))
+                return Results.Ok(CompactTupleCodec.FromGitStatus(outcome.Response!));
+            return Results.Ok(outcome.Response);
         });
 
         g.MapPost("/deps", async (
@@ -526,6 +491,29 @@ public static class CompactOpsEndpoints
             return Results.Ok(new CompactTestMapResponse(project.Name, mapped.Count, mapped));
         });
 
+        g.MapPost("/test/run", async (
+            CompactTestRunRequest request,
+            ProjectRegistry projects,
+            QueryTelemetry telemetry,
+            CancellationToken ct) =>
+        {
+            var sw = Stopwatch.StartNew();
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+
+            var proj = project!;
+            var target = request.Target?.Trim().ToLowerInvariant() ?? "auto";
+            var filter = request.Filter?.Trim();
+            var command = CompactOpsCommandBridge.ResolveTestCommand(proj.Config.ResolvedPath, target, filter);
+            if (command is null)
+                return Results.BadRequest("Could not determine test command for project.");
+
+            var response = await CompactOpsCommandBridge.RunTestAsync(proj, request, ct);
+
+            telemetry.Record("/api/compact/test/run", command.Value.Kind, proj.Name, sw.ElapsedMilliseconds, response.Count, response.ExitCode != 0, false, EstimateTokens(response.Diagnostics) + EstimateTokens(response.Output));
+            return Results.Ok(response);
+        });
+
         g.MapPost("/session/plan", (
             CompactSessionPlanRequest request,
             CompactSessionStore store) =>
@@ -553,55 +541,202 @@ public static class CompactOpsEndpoints
         g.MapPost("/js/check", async (
             CompactJsCheckRequest request,
             ProjectRegistry projects,
+            IJsCheckService jsCheckService,
             CancellationToken ct) =>
         {
             var (project, error) = ResolveProject(projects, request.Project);
             if (error is not null) return error;
 
-            var root = project!.Config.ResolvedPath;
-            var maxFiles = Math.Clamp(request.MaxFiles <= 0 ? 120 : request.MaxFiles, 1, 2000);
-            var timeoutMs = Math.Clamp(request.TimeoutMs <= 0 ? 12000 : request.TimeoutMs, 1000, 120000);
-            List<string> files;
-
-            if (!string.IsNullOrWhiteSpace(request.Path))
+            var outcome = await jsCheckService.RunAsync(project!, request, ct);
+            if (!outcome.Ok)
             {
-                var full = EnsureWithinProject(root, request.Path!);
-                if (full is null) return Results.BadRequest("Path is outside project root.");
-                if (File.Exists(full))
+                return outcome.ErrorKind switch
                 {
-                    files = IsJavaScriptFile(full) ? [full] : [];
-                }
-                else if (Directory.Exists(full))
+                    JsCheckErrorKind.BadRequest => Results.BadRequest(outcome.ErrorMessage ?? "Invalid request."),
+                    JsCheckErrorKind.NotFound => Results.NotFound(outcome.ErrorMessage ?? "Path not found."),
+                    _ => Results.BadRequest(outcome.ErrorMessage ?? "JS check failed.")
+                };
+            }
+
+            return Results.Ok(outcome.Response);
+        });
+
+        g.MapPost("/format", async (
+            CompactFormatRequest request,
+            ProjectRegistry projects,
+            QueryTelemetry telemetry,
+            CancellationToken ct) =>
+        {
+            var sw = Stopwatch.StartNew();
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+
+            var proj = project!;
+            var target = request.Target?.Trim().ToLowerInvariant() ?? "auto";
+            var checkOnly = request.CheckOnly;
+            var command = CompactOpsCommandBridge.ResolveFormatCommand(proj.Config.ResolvedPath, target, checkOnly, request.Path);
+            if (command is null)
+                return Results.BadRequest("Could not determine format command for project.");
+
+            var response = await CompactOpsCommandBridge.RunFormatAsync(proj, request, ct);
+
+            telemetry.Record("/api/compact/format", command.Value.Kind, proj.Name, sw.ElapsedMilliseconds, response.ExitCode, response.ExitCode != 0, false, EstimateTokens(response.Output));
+            return Results.Ok(response);
+        });
+
+        g.MapPost("/lint", async (
+            CompactLintRequest request,
+            ProjectRegistry projects,
+            QueryTelemetry telemetry,
+            CancellationToken ct) =>
+        {
+            var sw = Stopwatch.StartNew();
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+
+            var proj = project!;
+            var target = request.Target?.Trim().ToLowerInvariant() ?? "auto";
+            var command = CompactOpsCommandBridge.ResolveLintCommand(proj.Config.ResolvedPath, target, request.Path);
+            if (command is null)
+                return Results.BadRequest("Could not determine lint command for project.");
+
+            var response = await CompactOpsCommandBridge.RunLintAsync(proj, request, ct);
+
+            telemetry.Record("/api/compact/lint", command.Value.Kind, proj.Name, sw.ElapsedMilliseconds, response.Count, response.ExitCode != 0, false, EstimateTokens(response.Diagnostics) + EstimateTokens(response.Output));
+            return Results.Ok(response);
+        });
+
+        g.MapPost("/typecheck", async (
+            CompactTypecheckRequest request,
+            ProjectRegistry projects,
+            QueryTelemetry telemetry,
+            CancellationToken ct) =>
+        {
+            var sw = Stopwatch.StartNew();
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+
+            var proj = project!;
+            var target = request.Target?.Trim().ToLowerInvariant() ?? "auto";
+            var command = CompactOpsCommandBridge.ResolveTypecheckCommand(proj.Config.ResolvedPath, target);
+            if (command is null)
+                return Results.BadRequest("Could not determine typecheck command for project.");
+
+            var response = await CompactOpsCommandBridge.RunTypecheckAsync(proj, request, ct);
+
+            telemetry.Record("/api/compact/typecheck", command.Value.Kind, proj.Name, sw.ElapsedMilliseconds, response.Count, response.ExitCode != 0, false, EstimateTokens(response.Diagnostics) + EstimateTokens(response.Output));
+            return Results.Ok(response);
+        });
+
+        g.MapPost("/reindex", async (
+            CompactReindexRequest request,
+            ProjectRegistry projects,
+            ICodeMapCache cache,
+            ICodeIndexer indexer,
+            IFileScanner scanner,
+            QueryTelemetry telemetry,
+            CancellationToken ct) =>
+        {
+            var sw = Stopwatch.StartNew();
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+
+            var proj = project!;
+            var root = proj.Config.ResolvedPath;
+            var extensions = proj.Languages.SupportedExtensions;
+            var maxFiles = Math.Clamp(request.MaxFiles <= 0 ? 5000 : request.MaxFiles, 1, 50000);
+
+            var mode = "project";
+            var indexed = 0;
+            var removed = 0;
+            var skipped = 0;
+            var failed = 0;
+            var targetPath = request.Path;
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Path))
                 {
-                    files = EnumerateJavaScriptFiles(full, project.Config, maxFiles);
+                    if (request.PruneStale)
+                        removed += await PruneMissingIndexedFilesAsync(cache, indexer, proj, null, ct);
+
+                    await indexer.IndexRepoAsync(proj.Config, ct);
+                    indexed = (await cache.GetAllFilesAsync(proj.Name, ct)).Count();
                 }
                 else
                 {
-                    return Results.NotFound("Path not found.");
+                    var scope = EnsureWithinProject(root, request.Path!);
+                    if (scope is null)
+                        return Results.BadRequest("Path is outside project root.");
+
+                    if (File.Exists(scope))
+                    {
+                        mode = "file";
+                        if (!await scanner.ShouldIndexAsync(root, scope, extensions, ct))
+                        {
+                            skipped = 1;
+                        }
+                        else
+                        {
+                            await indexer.IndexFileAsync(proj.Name, scope, ct);
+                            indexed = 1;
+                        }
+                        targetPath = Path.GetRelativePath(root, scope);
+                    }
+                    else if (Directory.Exists(scope))
+                    {
+                        mode = "directory";
+                        if (request.PruneStale)
+                            removed += await PruneMissingIndexedFilesAsync(cache, indexer, proj, scope, ct);
+
+                        await foreach (var file in scanner.GetFilesAsync(scope, extensions, ct))
+                        {
+                            if (indexed >= maxFiles) break;
+                            if (!await scanner.ShouldIndexAsync(root, file, extensions, ct))
+                            {
+                                skipped++;
+                                continue;
+                            }
+
+                            try
+                            {
+                                await indexer.IndexFileAsync(proj.Name, file, ct);
+                                indexed++;
+                            }
+                            catch
+                            {
+                                failed++;
+                            }
+                        }
+                        targetPath = Path.GetRelativePath(root, scope);
+                    }
+                    else
+                    {
+                        return Results.NotFound("Path not found.");
+                    }
                 }
             }
-            else
+            catch (OperationCanceledException)
             {
-                files = EnumerateJavaScriptFiles(root, project.Config, maxFiles);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                telemetry.Record("/api/compact/reindex", mode, proj.Name, sw.ElapsedMilliseconds, indexed, indexed == 0, false, 0);
+                return Results.BadRequest($"reindex failed: {ex.Message}");
             }
 
-            var issues = new List<CompactJsCheckIssue>();
-            foreach (var file in files)
-            {
-                try
-                {
-                    var result = await RunProcessAsync("node", $"--check {QuoteArg(file)}", root, timeoutMs, ct);
-                    if (result.ExitCode == 0) continue;
-                    var msg = (string.IsNullOrWhiteSpace(result.Stderr) ? result.Stdout : result.Stderr).Trim();
-                    issues.Add(new CompactJsCheckIssue(file, result.ExitCode, Truncate(msg, 1200)));
-                }
-                catch (Exception ex)
-                {
-                    return Results.BadRequest($"node runtime is not available: {ex.Message}");
-                }
-            }
-
-            return Results.Ok(new CompactJsCheckResponse(project.Name, files.Count, issues.Count == 0, issues));
+            telemetry.Record("/api/compact/reindex", mode, proj.Name, sw.ElapsedMilliseconds, indexed, indexed == 0, false, 0);
+            return Results.Ok(new CompactReindexResponse(
+                proj.Name,
+                mode,
+                targetPath,
+                indexed,
+                removed,
+                skipped,
+                failed,
+                request.PruneStale,
+                sw.ElapsedMilliseconds));
         });
 
         g.MapPost("/dev/serve", (
@@ -783,16 +918,23 @@ public static class CompactOpsEndpoints
                 "/api/compact/fs/tree",
                 "/api/compact/fs/read-range",
                 "/api/compact/fs/write-file",
+                "/api/compact/fs/edit",
                 "/api/compact/fs/write-patch",
                 "/api/compact/fs/diff",
                 "/api/compact/git/history",
                 "/api/compact/git/commit",
                 "/api/compact/git/patch",
+                "/api/compact/git/status",
                 "/api/compact/deps",
                 "/api/compact/diagnostics",
                 "/api/compact/test/map",
+                "/api/compact/test/run",
                 "/api/compact/session/plan",
                 "/api/compact/js/check",
+                "/api/compact/format",
+                "/api/compact/lint",
+                "/api/compact/typecheck",
+                "/api/compact/reindex",
                 "/api/compact/dev/serve",
                 "/api/compact/dev/serve/stop",
                 "/api/compact/quality/guard",
@@ -909,6 +1051,37 @@ public static class CompactOpsEndpoints
         if (project is null)
             return (null, Results.NotFound($"Project '{projectName}' is not registered."));
         return (project, null);
+    }
+
+    private static async Task<int> PruneMissingIndexedFilesAsync(
+        ICodeMapCache cache,
+        ICodeIndexer indexer,
+        Project project,
+        string? scopePath,
+        CancellationToken ct)
+    {
+        var removed = 0;
+        var indexedFiles = await cache.GetAllFilesAsync(project.Name, ct);
+        foreach (var file in indexedFiles)
+        {
+            if (scopePath is not null && !IsPathWithin(file.FilePath, scopePath))
+                continue;
+            if (File.Exists(file.FilePath))
+                continue;
+
+            await indexer.RemoveFileAsync(project.Name, file.FilePath, ct);
+            removed++;
+        }
+        return removed;
+    }
+
+    private static bool IsPathWithin(string filePath, string scopePath)
+    {
+        var fullFile = Path.GetFullPath(filePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var fullScope = Path.GetFullPath(scopePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return fullFile.Equals(fullScope, StringComparison.OrdinalIgnoreCase)
+               || fullFile.StartsWith(fullScope + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+               || fullFile.StartsWith(fullScope + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool PathMatches(string path, string? prefix)
@@ -1056,6 +1229,108 @@ public static class CompactOpsEndpoints
         if (value.IndexOfAny([' ', '\t', '\n', '\r', '"']) < 0) return value;
         return "\"" + value.Replace("\"", "\\\"") + "\"";
     }
+
+    private static string MergeProcessOutput(string stdout, string stderr, int maxChars)
+    {
+        var text = string.IsNullOrWhiteSpace(stderr)
+            ? stdout ?? ""
+            : string.IsNullOrWhiteSpace(stdout)
+                ? stderr
+                : stdout + "\n" + stderr;
+        return text.Length <= maxChars ? text : text[..maxChars];
+    }
+
+    private static (string File, string Args, string Kind)? ResolveTestCommand(string root, string target, string? filter)
+    {
+        static string BuildDotnetTestArgs(string? value)
+        {
+            var args = "test -v minimal --nologo";
+            if (!string.IsNullOrWhiteSpace(value))
+                args += " --filter " + QuoteArg(value);
+            return args;
+        }
+
+        static string BuildCargoTestArgs(string? value)
+        {
+            var args = "test";
+            if (!string.IsNullOrWhiteSpace(value))
+                args += " " + QuoteArg(value);
+            return args;
+        }
+
+        static string BuildNodeTestArgs(string? value)
+        {
+            var args = "--test";
+            if (!string.IsNullOrWhiteSpace(value))
+                args += " " + QuoteArg(value);
+            return args;
+        }
+
+        return target switch
+        {
+            "dotnet" => ("dotnet", BuildDotnetTestArgs(filter), "dotnet"),
+            "cargo" => ("cargo", BuildCargoTestArgs(filter), "cargo"),
+            "node" => ("node", BuildNodeTestArgs(filter), "node"),
+            _ => File.Exists(Path.Combine(root, "Cargo.toml"))
+                ? ("cargo", BuildCargoTestArgs(filter), "cargo")
+                : File.Exists(Path.Combine(root, "package.json"))
+                    ? ("node", BuildNodeTestArgs(filter), "node")
+                    : HasDotnetProject(root)
+                        ? ("dotnet", BuildDotnetTestArgs(filter), "dotnet")
+                        : null
+        };
+    }
+
+    private static (string File, string Args, string Kind)? ResolveFormatCommand(string root, string target, bool checkOnly, string? path)
+    {
+        var fullPath = string.IsNullOrWhiteSpace(path) ? null : EnsureWithinProject(root, path!);
+        var relativePath = fullPath is null ? null : Path.GetRelativePath(root, fullPath);
+
+        static string BuildDotnetFormatArgs(bool verifyNoChanges, string? includePath)
+        {
+            var args = "format --verbosity minimal";
+            if (verifyNoChanges) args += " --verify-no-changes";
+            if (!string.IsNullOrWhiteSpace(includePath))
+                args += " --include " + QuoteArg(includePath);
+            return args;
+        }
+
+        static string BuildCargoFmtArgs(bool check, string? includePath)
+        {
+            var args = "fmt --all";
+            if (check) args += " -- --check";
+            if (!string.IsNullOrWhiteSpace(includePath))
+                args = "fmt --all";
+            return args;
+        }
+
+        static string BuildNodeFormatArgs(bool check, string? includePath)
+        {
+            var targetPath = string.IsNullOrWhiteSpace(includePath) ? "." : includePath;
+            return check
+                ? "exec prettier -- --check " + QuoteArg(targetPath)
+                : "exec prettier -- --write " + QuoteArg(targetPath);
+        }
+
+        return target switch
+        {
+            "dotnet" => ("dotnet", BuildDotnetFormatArgs(checkOnly, relativePath), "dotnet"),
+            "cargo" => ("cargo", BuildCargoFmtArgs(checkOnly, relativePath), "cargo"),
+            "node" => ("npm", BuildNodeFormatArgs(checkOnly, relativePath), "node"),
+            _ => File.Exists(Path.Combine(root, "Cargo.toml"))
+                ? ("cargo", BuildCargoFmtArgs(checkOnly, relativePath), "cargo")
+                : File.Exists(Path.Combine(root, "package.json"))
+                    ? ("npm", BuildNodeFormatArgs(checkOnly, relativePath), "node")
+                    : HasDotnetProject(root)
+                        ? ("dotnet", BuildDotnetFormatArgs(checkOnly, relativePath), "dotnet")
+                        : null
+        };
+    }
+
+    private static bool HasDotnetProject(string root)
+        => Directory.EnumerateFiles(root, "*.sln", SearchOption.TopDirectoryOnly).Any()
+           || Directory.EnumerateFiles(root, "*.csproj", SearchOption.TopDirectoryOnly).Any()
+           || Directory.EnumerateFiles(root, "*.fsproj", SearchOption.TopDirectoryOnly).Any();
 
     private static (Process Process, string Command) StartPythonServer(string cwd, string host, int port, bool preferPython3)
     {
@@ -1237,18 +1512,68 @@ public static class CompactOpsEndpoints
     {
         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         var outList = new List<CompactDiagnostic>();
-        var rx = new Regex(@"^(?<path>.+?)\((?<line>\d+),(?<col>\d+)\):\s*(?<severity>error|warning)\s*(?<code>[A-Z0-9]+):\s*(?<msg>.+)$", RegexOptions.IgnoreCase);
+        var rxCs = new Regex(@"^(?<path>.+?)\((?<line>\d+),(?<col>\d+)\):\s*(?<severity>error|warning)\s*(?<code>[A-Z0-9]+):\s*(?<msg>.+)$", RegexOptions.IgnoreCase);
+        var rxTs = new Regex(@"^(?<path>.+?):(?<line>\d+):(?<col>\d+)\s*-\s*(?<severity>error|warning)\s*(?<code>[A-Z]+\d+):\s*(?<msg>.+)$", RegexOptions.IgnoreCase);
+        var rxRustHeader = new Regex(@"^(?<severity>error|warning)(?:\[(?<code>[A-Z0-9_]+)\])?:\s*(?<msg>.+)$", RegexOptions.IgnoreCase);
+        var rxRustLoc = new Regex(@"^\s*-->\s*(?<path>.+?):(?<line>\d+):(?<col>\d+)\s*$", RegexOptions.IgnoreCase);
+        string? pendingSeverity = null;
+        string? pendingCode = null;
+        string? pendingMessage = null;
         foreach (var line in lines)
         {
-            var m = rx.Match(line.Trim());
-            if (!m.Success) continue;
+            var trimmed = line.Trim();
+
+            var mCs = rxCs.Match(trimmed);
+            if (mCs.Success)
+            {
+                outList.Add(new CompactDiagnostic(
+                    Path: mCs.Groups["path"].Value,
+                    Line: int.TryParse(mCs.Groups["line"].Value, out var lnCs) ? lnCs : 0,
+                    Col: int.TryParse(mCs.Groups["col"].Value, out var colCs) ? colCs : 0,
+                    Severity: mCs.Groups["severity"].Value.ToLowerInvariant(),
+                    Code: mCs.Groups["code"].Value,
+                    Message: Truncate(mCs.Groups["msg"].Value, 260)));
+                if (outList.Count >= max) break;
+                continue;
+            }
+
+            var mTs = rxTs.Match(trimmed);
+            if (mTs.Success)
+            {
+                outList.Add(new CompactDiagnostic(
+                    Path: mTs.Groups["path"].Value,
+                    Line: int.TryParse(mTs.Groups["line"].Value, out var lnTs) ? lnTs : 0,
+                    Col: int.TryParse(mTs.Groups["col"].Value, out var colTs) ? colTs : 0,
+                    Severity: mTs.Groups["severity"].Value.ToLowerInvariant(),
+                    Code: mTs.Groups["code"].Value,
+                    Message: Truncate(mTs.Groups["msg"].Value, 260)));
+                if (outList.Count >= max) break;
+                continue;
+            }
+
+            var mRustHeader = rxRustHeader.Match(trimmed);
+            if (mRustHeader.Success)
+            {
+                pendingSeverity = mRustHeader.Groups["severity"].Value.ToLowerInvariant();
+                pendingCode = mRustHeader.Groups["code"].Success ? mRustHeader.Groups["code"].Value : "";
+                pendingMessage = mRustHeader.Groups["msg"].Value;
+                continue;
+            }
+
+            if (pendingMessage is null) continue;
+            var mRustLoc = rxRustLoc.Match(trimmed);
+            if (!mRustLoc.Success) continue;
+
             outList.Add(new CompactDiagnostic(
-                Path: m.Groups["path"].Value,
-                Line: int.TryParse(m.Groups["line"].Value, out var ln) ? ln : 0,
-                Col: int.TryParse(m.Groups["col"].Value, out var c) ? c : 0,
-                Severity: m.Groups["severity"].Value.ToLowerInvariant(),
-                Code: m.Groups["code"].Value,
-                Message: Truncate(m.Groups["msg"].Value, 260)));
+                Path: mRustLoc.Groups["path"].Value,
+                Line: int.TryParse(mRustLoc.Groups["line"].Value, out var ln) ? ln : 0,
+                Col: int.TryParse(mRustLoc.Groups["col"].Value, out var c) ? c : 0,
+                Severity: pendingSeverity ?? "error",
+                Code: pendingCode ?? "",
+                Message: Truncate(pendingMessage, 260)));
+            pendingSeverity = null;
+            pendingCode = null;
+            pendingMessage = null;
             if (outList.Count >= max) break;
         }
         return outList;
@@ -1500,6 +1825,27 @@ public class CompactFsWriteFileRequest
 }
 public record CompactFsWriteFileResponse(string Project, string Path, int Chars, long Bytes, bool Exists);
 
+public class CompactFsEditRequest
+{
+    public string Project { get; init; } = "";
+    public bool DryRun { get; init; }
+    public List<CompactFsEditOp>? Operations { get; init; }
+}
+
+public class CompactFsEditOp
+{
+    public string Path { get; init; } = "";
+    public string Type { get; init; } = "replace_range"; // replace_range | insert_before | insert_after | delete_range | replace_snippet
+    public int? StartLine { get; init; }
+    public int? EndLine { get; init; }
+    public string? Content { get; init; }
+    public string? Find { get; init; }
+    public int? Occurrence { get; init; } = 1; // for replace_snippet: 1-based, <=0 means all
+}
+
+public record CompactFsEditOpResult(string Path, string Type, bool Ok, string Status, int ChangedLines, int FromLine, int ToLine);
+public record CompactFsEditResponse(string Project, bool DryRun, int Applied, int Failed, List<CompactFsEditOpResult> Results);
+
 public class CompactFsWritePatchRequest
 {
     public string Project { get; init; } = "";
@@ -1531,10 +1877,22 @@ public record CompactFsDiffResponse(string Project, bool IsGitRepo, string? Path
 public record CompactGitHistoryRequest(string Project, string? Path = null, string? Since = null, string? Until = null, int MaxCommits = 20, string Mode = "meta");
 public record CompactGitCommitRequest(string Project, string CommitId, string? Path = null, string Mode = "compact");
 public record CompactGitPatchRequest(string Project, string CommitId, string? Path = null, int MaxChars = 30000);
+public class CompactGitStatusRequest
+{
+    public string Project { get; init; } = "";
+    public string? Path { get; init; }
+    public string Mode { get; init; } = "compact"; // compact | full
+    public string? Format { get; init; } // tuple | (default object)
+    public bool IncludeUntracked { get; init; } = true;
+    public int MaxEntries { get; init; } = 500;
+    public int TimeoutMs { get; init; } = 15000;
+}
 
 public record CompactGitHistoryResponse(string Project, bool IsGitRepo, string Mode, List<CompactGitCommit> Commits);
 public record CompactGitCommitResponse(string Project, bool IsGitRepo, CompactGitCommit? Commit);
 public record CompactGitPatchResponse(string Project, bool IsGitRepo, string CommitId, string? Path, string Patch);
+public record CompactGitStatusResponse(string Project, bool IsGitRepo, string? Path, string Mode, int Count, List<CompactGitStatusEntry> Entries, List<string> Compact);
+public record CompactGitStatusEntry(string Path, string Xy, bool Staged, bool Unstaged, bool Untracked, string? RenamedFrom);
 
 public record CompactGitCommit(
     string Id,
@@ -1577,6 +1935,16 @@ public class CompactTestMapRequest
 public record CompactTestCandidate(string Path, int Score);
 public record CompactTestMapResponse(string Project, int Count, List<CompactTestCandidate> Candidates);
 
+public class CompactTestRunRequest
+{
+    public string Project { get; init; } = "";
+    public string? Target { get; init; }
+    public string? Filter { get; init; }
+    public int TimeoutMs { get; init; } = 120000;
+    public int MaxChars { get; init; } = 20000;
+}
+public record CompactTestRunResponse(string Project, string Target, int ExitCode, int Count, List<CompactDiagnostic> Diagnostics, string Output);
+
 public class CompactSessionPlanRequest
 {
     public string SessionId { get; init; } = "";
@@ -1603,6 +1971,45 @@ public class CompactJsCheckRequest
 }
 public record CompactJsCheckIssue(string Path, int ExitCode, string Message);
 public record CompactJsCheckResponse(string Project, int CheckedFiles, bool Ok, List<CompactJsCheckIssue> Issues);
+
+public class CompactFormatRequest
+{
+    public string Project { get; init; } = "";
+    public string? Target { get; init; }
+    public string? Path { get; init; }
+    public bool CheckOnly { get; init; } = true;
+    public int TimeoutMs { get; init; } = 120000;
+    public int MaxChars { get; init; } = 12000;
+}
+public record CompactFormatResponse(string Project, string Target, bool CheckOnly, int ExitCode, string Output);
+
+public class CompactLintRequest
+{
+    public string Project { get; init; } = "";
+    public string? Target { get; init; }
+    public string? Path { get; init; }
+    public int TimeoutMs { get; init; } = 120000;
+    public int MaxChars { get; init; } = 16000;
+}
+public record CompactLintResponse(string Project, string Target, int ExitCode, int Count, List<CompactDiagnostic> Diagnostics, string Output);
+
+public class CompactTypecheckRequest
+{
+    public string Project { get; init; } = "";
+    public string? Target { get; init; }
+    public int TimeoutMs { get; init; } = 120000;
+    public int MaxChars { get; init; } = 16000;
+}
+public record CompactTypecheckResponse(string Project, string Target, int ExitCode, int Count, List<CompactDiagnostic> Diagnostics, string Output);
+
+public class CompactReindexRequest
+{
+    public string Project { get; init; } = "";
+    public string? Path { get; init; }
+    public bool PruneStale { get; init; } = true;
+    public int MaxFiles { get; init; } = 5000;
+}
+public record CompactReindexResponse(string Project, string Mode, string? Path, int Indexed, int Removed, int Skipped, int Failed, bool Pruned, long DurationMs);
 
 public class CompactDevServeRequest
 {

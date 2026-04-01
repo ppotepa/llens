@@ -1,9 +1,10 @@
 using Llens.Api;
+using Llens.Application.Fs;
+using Llens.Application.JsCheck;
 using Llens.Caching;
+using Llens.Cli;
 using Llens.Indexing;
 using Llens.Languages;
-using Llens.Languages.CSharp;
-using Llens.Languages.Rust;
 using Llens.Models;
 using Llens.Observability;
 using Llens.Scanning;
@@ -11,8 +12,8 @@ using Llens.Watching;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSingleton<ILanguage, CSharpLanguage>();
-builder.Services.AddSingleton<ILanguage, RustLanguage>();
+foreach (var language in LanguagePluginLoader.LoadFromBaseDirectory(AppContext.BaseDirectory))
+    builder.Services.AddSingleton<ILanguage>(language);
 builder.Services.AddSingleton<LanguageCatalogue>();
 
 builder.Services.AddSingleton<ProjectRegistry>(sp =>
@@ -34,9 +35,22 @@ builder.Services.AddSingleton<ICodeIndexer, CodeIndexer>();
 builder.Services.AddSingleton<QueryTelemetry>();
 builder.Services.AddSingleton<CompactSessionStore>();
 builder.Services.AddSingleton<CompactDevServerStore>();
+builder.Services.AddSingleton<IJsCheckService, JsCheckService>();
+builder.Services.AddSingleton<ICompactFsService, CompactFsService>();
+builder.Services.AddSingleton<CompactCliCommands>();
+builder.Services.AddSingleton<CliCommandRegistry>();
+builder.Services.AddSingleton<CliCommandRunner>();
 builder.Services.AddHostedService<RepoWatcherService>();
 
 var app = builder.Build();
+
+if (args.Length > 0 && args[0].Equals("cli", StringComparison.OrdinalIgnoreCase))
+{
+    var runner = app.Services.GetRequiredService<CliCommandRunner>();
+    var exitCode = await runner.RunAsync(args.Skip(1).ToArray(), CancellationToken.None);
+    Environment.ExitCode = exitCode;
+    return;
+}
 
 app.UseStaticFiles();
 app.MapGet("/browse", () => Results.Redirect("/browse.html"));

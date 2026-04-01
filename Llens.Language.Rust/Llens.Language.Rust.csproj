@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Llens.Core\Llens.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Rust/**/*.cs" />
+    <Compile Include="Tools/**/*.cs" />
+    <Compile Include="Indexing/**/*.cs" />
+  </ItemGroup>
+
+</Project>

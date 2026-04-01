@@ -348,17 +348,24 @@ Token-efficient, minimal-shape endpoints for development loops:
 - `POST /api/compact/fs/tree`
 - `POST /api/compact/fs/read-range`
 - `POST /api/compact/fs/write-file`
+- `POST /api/compact/fs/edit`
 - `POST /api/compact/fs/write-patch`
 - `POST /api/compact/fs/diff`
 - `POST /api/compact/git/history`
 - `POST /api/compact/git/commit`
 - `POST /api/compact/git/patch`
+- `POST /api/compact/git/status`
 - `POST /api/compact/deps`
 - `POST /api/compact/diagnostics`
 - `POST /api/compact/test/map`
+- `POST /api/compact/test/run`
 - `POST /api/compact/session/plan`
 - `GET /api/compact/session/plan?sessionId=...`
 - `POST /api/compact/js/check`
+- `POST /api/compact/format`
+- `POST /api/compact/lint`
+- `POST /api/compact/typecheck`
+- `POST /api/compact/reindex`
 - `POST /api/compact/dev/serve`
 - `POST /api/compact/dev/serve/stop`
 - `POST /api/compact/quality/guard`
@@ -366,6 +373,38 @@ Token-efficient, minimal-shape endpoints for development loops:
 - `POST /api/compact/refactor/rename-plan`
 - `GET /api/compact/schema`
 - `POST /api/compact/workflow/run`
+
+## CLI Mode (Shared Services)
+
+Run compact operations through CLI arguments (no HTTP payload construction):
+
+```bash
+dotnet run -- cli --help
+dotnet run -- cli js.check --project example-app --path scripts
+```
+
+Current command coverage:
+- `js.check`
+- `fs.tree`
+- `fs.read-range`
+- `fs.write-file`
+- `fs.edit`
+- `fs.diff`
+- `git.status`
+- `reindex`
+- `test.run`
+- `format`
+- `lint`
+- `typecheck`
+
+Design notes:
+- API endpoints and CLI commands call shared application services.
+- CLI uses attribute metadata for command/arg discovery.
+- Required vs optional follows CLR nullability:
+  - non-nullable value type (for example `int`) => required
+  - nullable value type (for example `int?`) => optional
+  - non-nullable reference type (for example `string`) => required
+  - nullable reference type (for example `string?`) => optional
 
 Common compact output style:
 - short keys
@@ -386,6 +425,11 @@ Example (`/api/compact/query`):
   ]
 }
 ```
+
+Tuple mode (token-optimized) is available on:
+- `POST /api/compact/query` with `"format":"tuple"`
+- `POST /api/compact/context-pack` with `"format":"tuple"`
+- `POST /api/compact/git/status` with `"format":"tuple"`
 
 Resolver endpoint:
 - `/api/compact/resolve` runs deterministic fallback chain:
@@ -435,6 +479,16 @@ Reads a bounded line range from a file in project root.
 ### `POST /api/compact/fs/write-file`
 Creates or overwrites a file in project root (language-agnostic).
 
+### `POST /api/compact/fs/edit`
+Applies targeted partial edits (line/snippet operations) to avoid full-file rewrites.
+
+Supported op `type` values:
+- `replace_range` (`startLine`, `endLine`, `content`)
+- `insert_before` (`startLine`, `content`)
+- `insert_after` (`startLine`, `content`)
+- `delete_range` (`startLine`, `endLine`)
+- `replace_snippet` (`find`, `content`, optional `occurrence`; `<=0` means all)
+
 ### `POST /api/compact/fs/write-patch`
 Applies or dry-runs patch operations (`literal` or `regex`) on files in project root.
 
@@ -452,6 +506,11 @@ Single-commit detail in `meta|compact` mode.
 ### `POST /api/compact/git/patch`
 Full patch text on demand (`maxChars` bounded).
 
+### `POST /api/compact/git/status`
+Working tree status with token-efficient mode:
+- `mode=compact` (default): returns preformatted compact lines
+- `mode=full`: returns structured entries + compact lines
+
 ### `POST /api/compact/deps`
 Dependency edges for seed:
 - file seed: imports + reverse dependents
@@ -459,6 +518,10 @@ Dependency edges for seed:
 
 ### `POST /api/compact/diagnostics`
 Runs project checks (`dotnet build` or `cargo check`) and returns parsed diagnostics.
+Supported parser formats:
+- C#: `path(line,col): error CODE: message`
+- TS/JS: `path:line:col - error TSxxxx: message`
+- Rust: `error...` with `--> path:line:col`
 
 ### `POST /api/compact/test/map`
 Finds tests and related test files for a query or seed.
@@ -501,6 +564,291 @@ Recommended deterministic retrieval sequence:
 3. `POST /api/graph/expand` iteratively using `excludeNodeIds`/`excludeEdgeIds` and pagination while more context is needed.
 4. `POST /api/graph/collapse` when branch cleanup is needed in graph state.
 5. `GET /api/files/context` for final line-window snippets before prompt assembly.
+
+## Common Operations (Copy/Paste)
+
+### 1) Check service and projects
+
+```bash
+curl -sS http://localhost:5100/health | jq
+```
+
+### 2) Fast symbol lookup (compact object mode)
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/query \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"llens",
+    "mode":"fuzzy",
+    "q":"CompactFsService",
+    "limit":10
+  }' | jq
+```
+
+### 3) Fast symbol lookup (tuple mode, lower token payload)
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/query \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"llens",
+    "mode":"fuzzy",
+    "q":"CompactFsService",
+    "limit":10,
+    "format":"tuple"
+  }' | jq
+```
+
+### 4) Deterministic resolve chain (`exact -> fuzzy -> snippet`)
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/resolve \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"llens",
+    "q":"MapCompactRoutes",
+    "limit":8
+  }' | jq
+```
+
+### 5) Build compact context for LLM (with dedupe via `previousIds`)
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/context-pack \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"llens",
+    "mode":"fuzzy",
+    "q":"graph expand pagination",
+    "tokenBudget":700,
+    "maxItems":15,
+    "previousIds":[]
+  }' | jq
+```
+
+Tuple variant:
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/context-pack \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"llens",
+    "mode":"fuzzy",
+    "q":"graph expand pagination",
+    "tokenBudget":700,
+    "maxItems":15,
+    "format":"tuple"
+  }' | jq
+```
+
+### 6) Read a file range
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/fs/read-range \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"example-app",
+    "path":"scripts/nav.js",
+    "from":1,
+    "to":80
+  }' | jq
+```
+
+### 7) Edit a file portion (no full-file rewrite)
+
+Dry-run:
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/fs/edit \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"example-app",
+    "dryRun":true,
+    "operations":[
+      {
+        "path":"index.html",
+        "type":"replace_snippet",
+        "find":"Start Here",
+        "content":"Start Here (Updated)",
+        "occurrence":1
+      },
+      {
+        "path":"index.html",
+        "type":"insert_after",
+        "startLine":24,
+        "content":"      <p class=\"muted\">Edited via fs.edit</p>"
+      }
+    ]
+  }' | jq
+```
+
+Apply:
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/fs/edit \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"example-app",
+    "dryRun":false,
+    "operations":[
+      {
+        "path":"index.html",
+        "type":"replace_snippet",
+        "find":"Start Here",
+        "content":"Start Here (Updated)",
+        "occurrence":1
+      }
+    ]
+  }' | jq
+```
+
+### 8) Get git status (compact, object mode)
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/git/status \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"example-app",
+    "mode":"compact",
+    "maxEntries":50
+  }' | jq
+```
+
+Tuple variant:
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/git/status \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"example-app",
+    "mode":"compact",
+    "maxEntries":50,
+    "format":"tuple"
+  }' | jq
+```
+
+### 9) JavaScript syntax check for a project directory
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/js/check \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"example-app",
+    "path":"scripts"
+  }' | jq
+```
+
+### 10) Reindex a project, file, or directory
+
+Project-wide refresh with stale-cache pruning:
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/reindex \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"llens",
+    "pruneStale":true
+  }' | jq
+```
+
+Directory-scoped refresh:
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/reindex \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"example-app",
+    "path":"scripts",
+    "pruneStale":true,
+    "maxFiles":200
+  }' | jq
+```
+
+### 11) Run tests with auto-detected backend
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/test/run \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"rust-basic",
+    "target":"cargo",
+    "timeoutMs":120000
+  }' | jq
+```
+
+### 12) Check formatting without writing files
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/format \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"rust-basic",
+    "target":"cargo",
+    "checkOnly":true
+  }' | jq
+```
+
+### 13) Run lint/analyzer checks
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/lint \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"rust-basic",
+    "target":"cargo",
+    "timeoutMs":120000
+  }' | jq
+```
+
+### 14) Run typecheck/build-check
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/typecheck \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"llens",
+    "target":"dotnet",
+    "timeoutMs":120000
+  }' | jq
+```
+
+### 15) Start and stop static preview server
+
+Start:
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/dev/serve \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"example-app",
+    "path":".",
+    "port":5132,
+    "serverId":"example-app-dev"
+  }' | jq
+```
+
+Stop:
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/dev/serve/stop \
+  -H 'Content-Type: application/json' \
+  -d '{"serverId":"example-app-dev"}' | jq
+```
+
+### 16) CLI equivalents (shared services, no curl payloads)
+
+```bash
+dotnet run --no-build -- cli js.check --project example-app --path scripts
+dotnet run --no-build -- cli reindex --project llens --prune-stale true
+dotnet run --no-build -- cli test.run --project rust-basic --target cargo
+dotnet run --no-build -- cli format --project rust-basic --target cargo --check-only true
+dotnet run --no-build -- cli lint --project rust-basic --target cargo
+dotnet run --no-build -- cli typecheck --project llens --target dotnet
+dotnet run --no-build -- cli fs.read-range --project example-app --path scripts/nav.js --from 1 --to 60
+dotnet run --no-build -- cli git.status --project example-app --mode compact --format tuple --max-entries 20
+dotnet run --no-build -- cli fs.diff --project llens --path Program.cs --max-chars 5000
+```
 
 ## Curl Examples
 

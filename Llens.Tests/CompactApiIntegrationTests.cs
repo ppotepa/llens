@@ -257,6 +257,110 @@ public sealed class CompactApiIntegrationTests
         Assert.Equal(JsonValueKind.Object, root.GetProperty("contextPack").ValueKind);
     }
 
+    [Fact]
+    public async Task Reindex_FileScope_ReturnsExpectedShape()
+    {
+        var payload = """
+                      {
+                        "project":"llens",
+                        "path":"Program.cs",
+                        "pruneStale": true
+                      }
+                      """;
+
+        using var resp = await PostAsync("/api/compact/reindex", payload);
+        resp.EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var root = doc.RootElement;
+        Assert.Equal("llens", root.GetProperty("project").GetString());
+        Assert.Equal("file", root.GetProperty("mode").GetString());
+        Assert.True(root.GetProperty("indexed").GetInt32() >= 0);
+        Assert.True(root.GetProperty("removed").GetInt32() >= 0);
+    }
+
+    [Fact]
+    public async Task TestRun_RustBasic_ReturnsExpectedShape()
+    {
+        var payload = """
+                      {
+                        "project":"rust-basic",
+                        "target":"cargo",
+                        "timeoutMs":120000,
+                        "maxChars":4000
+                      }
+                      """;
+
+        using var resp = await PostAsync("/api/compact/test/run", payload);
+        resp.EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+        var root = doc.RootElement;
+        Assert.Equal("rust-basic", root.GetProperty("project").GetString());
+        Assert.Equal("cargo", root.GetProperty("target").GetString());
+        Assert.Equal(JsonValueKind.Array, root.GetProperty("diagnostics").ValueKind);
+        Assert.Equal(JsonValueKind.String, root.GetProperty("output").ValueKind);
+    }
+
+    [Fact]
+    public async Task FormatAndLint_ReturnExpectedShape()
+    {
+        var formatPayload = """
+                            {
+                              "project":"rust-basic",
+                              "target":"cargo",
+                              "checkOnly":true,
+                              "timeoutMs":120000,
+                              "maxChars":4000
+                            }
+                            """;
+
+        using var formatResp = await PostAsync("/api/compact/format", formatPayload);
+        formatResp.EnsureSuccessStatusCode();
+        using var formatDoc = JsonDocument.Parse(await formatResp.Content.ReadAsStringAsync());
+        var formatRoot = formatDoc.RootElement;
+        Assert.Equal("rust-basic", formatRoot.GetProperty("project").GetString());
+        Assert.Equal("cargo", formatRoot.GetProperty("target").GetString());
+        Assert.True(formatRoot.GetProperty("checkOnly").GetBoolean());
+        Assert.Equal(JsonValueKind.String, formatRoot.GetProperty("output").ValueKind);
+
+        var lintPayload = """
+                          {
+                            "project":"llens",
+                            "target":"dotnet",
+                            "timeoutMs":120000,
+                            "maxChars":4000
+                          }
+                          """;
+
+        using var lintResp = await PostAsync("/api/compact/lint", lintPayload);
+        lintResp.EnsureSuccessStatusCode();
+        using var lintDoc = JsonDocument.Parse(await lintResp.Content.ReadAsStringAsync());
+        var lintRoot = lintDoc.RootElement;
+        Assert.Equal("llens", lintRoot.GetProperty("project").GetString());
+        Assert.Equal("dotnet", lintRoot.GetProperty("target").GetString());
+        Assert.Equal(JsonValueKind.Array, lintRoot.GetProperty("diagnostics").ValueKind);
+        Assert.Equal(JsonValueKind.String, lintRoot.GetProperty("output").ValueKind);
+
+        var typecheckPayload = """
+                               {
+                                 "project":"llens",
+                                 "target":"dotnet",
+                                 "timeoutMs":120000,
+                                 "maxChars":4000
+                               }
+                               """;
+
+        using var tcResp = await PostAsync("/api/compact/typecheck", typecheckPayload);
+        tcResp.EnsureSuccessStatusCode();
+        using var tcDoc = JsonDocument.Parse(await tcResp.Content.ReadAsStringAsync());
+        var tcRoot = tcDoc.RootElement;
+        Assert.Equal("llens", tcRoot.GetProperty("project").GetString());
+        Assert.Equal("dotnet", tcRoot.GetProperty("target").GetString());
+        Assert.Equal(JsonValueKind.Array, tcRoot.GetProperty("diagnostics").ValueKind);
+        Assert.Equal(JsonValueKind.String, tcRoot.GetProperty("output").ValueKind);
+    }
+
     private Task<HttpResponseMessage> PostAsync(string path, string payload)
         => _fx.Client.PostAsync(path, new StringContent(payload, Encoding.UTF8, "application/json"));
 

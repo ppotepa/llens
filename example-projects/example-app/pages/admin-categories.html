@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Categories</title>
+  <link rel="stylesheet" href="../styles/base.css" />
+</head><body>
+  <header class="topbar"><h1>Example App Store</h1><nav id="app-nav" class="nav"></nav></header>
+  <main class="page grid" style="gap:10px">
+    <section class="card">
+      <h2>Add Category</h2>
+      <form id="category-form" class="row">
+        <input id="category-name" placeholder="Category name" required />
+        <button type="submit">Create</button>
+      </form>
+    </section>
+    <section class="card">
+      <h2>Categories</h2>
+      <ul id="categories-list" class="list"></ul>
+    </section>
+  </main>
+  <script type="module" src="../scripts/admin-categories.js"></script>
+</body></html>

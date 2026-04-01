@@ -54,6 +54,8 @@ public static class CompactEndpoints
                 usedFallback: false,
                 estimatedTokens: response.Tokens);
 
+            if (IsTupleFormat(request.Format))
+                return Results.Ok(CompactTupleCodec.FromQuery(response));
             return Results.Ok(response);
         });
 
@@ -172,6 +174,8 @@ public static class CompactEndpoints
                 usedFallback: false,
                 estimatedTokens: used);
 
+            if (IsTupleFormat(request.Format))
+                return Results.Ok(CompactTupleCodec.FromContextPack(response));
             return Results.Ok(response);
         });
 
@@ -542,6 +546,9 @@ public static class CompactEndpoints
             _ => "fuzzy"
         };
 
+    private static bool IsTupleFormat(string? format)
+        => string.Equals(format?.Trim(), "tuple", StringComparison.OrdinalIgnoreCase);
+
     private static string? NormalizeSymbolSeed(string? seedId)
     {
         if (string.IsNullOrWhiteSpace(seedId)) return null;
@@ -596,6 +603,7 @@ public class CompactQueryRequest
     public string Q { get; init; } = "";
     public string Mode { get; init; } = "fuzzy";
     public int Limit { get; init; } = 12;
+    public string? Format { get; init; }
 }
 
 public class CompactContextPackRequest
@@ -606,6 +614,7 @@ public class CompactContextPackRequest
     public int TokenBudget { get; init; } = 600;
     public int MaxItems { get; init; } = 30;
     public string[]? PreviousIds { get; init; }
+    public string? Format { get; init; }
 }
 
 public class CompactGraphRequest

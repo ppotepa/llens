@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cart</title>
+  <link rel="stylesheet" href="../styles/base.css" />
+</head><body>
+  <header class="topbar"><h1>Example App Store</h1><nav id="app-nav" class="nav"></nav></header>
+  <main class="page grid" style="gap:10px">
+    <section class="card">
+      <div class="row" style="justify-content:space-between"><h2>Cart</h2><button id="clear-cart" class="soft">Clear</button></div>
+      <ul id="cart-list" class="list"></ul>
+      <p id="cart-total" class="money">Total: $0.00</p>
+    </section>
+  </main>
+  <script type="module" src="../scripts/cart.js"></script>
+</body></html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Products</title>
+  <link rel="stylesheet" href="../styles/base.css" />
+</head><body>
+  <header class="topbar"><h1>Example App Store</h1><nav id="app-nav" class="nav"></nav></header>
+  <main class="page grid" style="gap:10px">
+    <section class="card">
+      <h2>Add Product</h2>
+      <form id="product-form" class="two-col">
+        <input id="new-name" placeholder="Name" required />
+        <select id="new-category" required></select>
+        <input id="new-price" type="number" min="0" step="0.01" placeholder="Price" required />
+        <input id="new-stock" type="number" min="0" step="1" placeholder="Stock" required />
+        <button type="submit">Create Product</button>
+      </form>
+    </section>
+
+    <section class="card" style="overflow:auto">
+      <h2>Products</h2>
+      <table style="width:100%; border-collapse:collapse">
+        <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Preview</th><th>Actions</th></tr></thead>
+        <tbody id="products-body"></tbody>
+      </table>
+    </section>
+  </main>
+  <script type="module" src="../scripts/admin-products.js"></script>
+</body></html>
