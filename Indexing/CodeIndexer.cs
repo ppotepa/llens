@@ -1,6 +1,7 @@
 using Llens.Caching;
 using Llens.Models;
 using Llens.Tools;
+using Llens.Languages;
 
 namespace Llens.Indexing;
 
@@ -50,7 +51,7 @@ public class CodeIndexer(ProjectRegistry projects, ICodeMapCache cache, ILogger<
         var allSymbols = new List<CodeSymbol>();
         var allImports = new List<string>();
 
-        foreach (var tool in language.GetTools(ToolPurpose.Indexing))
+        foreach (var tool in language.GetTools(ToolCapability.SymbolExtraction))
         {
             var result = await tool.ExecuteAsync(context, ct);
             if (result.Success)
@@ -59,7 +60,7 @@ public class CodeIndexer(ProjectRegistry projects, ICodeMapCache cache, ILogger<
                 allImports.AddRange(result.Imports);
             }
             else
-                logger.LogWarning("[{Kind}] failed on {File}: {Error}", tool.Kind, filePath, result.Error);
+                logger.LogWarning("[{Tool}] failed on {File}: {Error}", tool.GetType().Name, filePath, result.Error);
         }
 
         await cache.StoreSymbolsAsync(filePath, allSymbols, ct);

@@ -5,10 +5,14 @@ using Llens.Models;
 
 namespace Llens.Languages.CSharp;
 
+/// <summary>
+/// Roslyn-based tool for C#. Covers both symbol extraction and import extraction
+/// in a single AST pass — no need to parse the file twice.
+/// </summary>
 public class RoslynTool : ITool<CSharp>
 {
-    public ToolKind Kind => ToolKind.Roslyn;
-    public ToolPurpose Purpose => ToolPurpose.Indexing;
+    public IReadOnlySet<ToolCapability> Capabilities { get; } =
+        new HashSet<ToolCapability> { ToolCapability.SymbolExtraction, ToolCapability.ImportExtraction };
 
     public async Task<ToolResult> ExecuteAsync(ToolContext context, CancellationToken ct = default)
     {

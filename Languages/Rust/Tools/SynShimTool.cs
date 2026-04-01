@@ -2,10 +2,14 @@ using Llens.Tools;
 
 namespace Llens.Languages.Rust;
 
+/// <summary>
+/// Invokes the syn-shim Rust binary to extract symbols and imports from .rs files.
+/// Covers both SymbolExtraction and ImportExtraction via a single subprocess call.
+/// </summary>
 public class SynShimTool : ITool<Rust>
 {
-    public ToolKind Kind => ToolKind.SynShim;
-    public ToolPurpose Purpose => ToolPurpose.Indexing;
+    public IReadOnlySet<ToolCapability> Capabilities { get; } =
+        new HashSet<ToolCapability> { ToolCapability.SymbolExtraction, ToolCapability.ImportExtraction };
 
     public async Task<ToolResult> ExecuteAsync(ToolContext context, CancellationToken ct = default)
     {

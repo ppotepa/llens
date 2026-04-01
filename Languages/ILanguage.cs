@@ -11,13 +11,16 @@ public interface ILanguage
     string Name { get; }
     IReadOnlyList<string> Extensions { get; }
     IReadOnlyList<ITool> Tools { get; }
+
     bool CanHandle(string filePath) => Extensions.Contains(Path.GetExtension(filePath));
 
-    /// <summary>Fast O(1) tool lookup by kind — avoids linear scan on every file.</summary>
-    ITool? GetTool(ToolKind kind) => Tools.FirstOrDefault(t => t.Kind == kind);
+    /// <summary>All tools that cover a given capability, in registration order.</summary>
+    IEnumerable<ITool> GetTools(ToolCapability capability)
+        => Tools.Where(t => t.Supports(capability));
 
-    /// <summary>All tools for a given purpose, in priority order.</summary>
-    IEnumerable<ITool> GetTools(ToolPurpose purpose) => Tools.Where(t => t.Purpose == purpose);
+    /// <summary>First tool that covers a given capability — O(n tools), typically small.</summary>
+    ITool? GetTool(ToolCapability capability)
+        => Tools.FirstOrDefault(t => t.Supports(capability));
 }
 
 /// <summary>

@@ -7,8 +7,11 @@ namespace Llens.Tools;
 /// </summary>
 public interface ITool
 {
-    ToolKind Kind { get; }
-    ToolPurpose Purpose { get; }
+    /// <summary>What this tool contributes. May cover multiple capabilities.</summary>
+    IReadOnlySet<ToolCapability> Capabilities { get; }
+
+    bool Supports(ToolCapability capability) => Capabilities.Contains(capability);
+
     Task<ToolResult> ExecuteAsync(ToolContext context, CancellationToken ct = default);
 }
 

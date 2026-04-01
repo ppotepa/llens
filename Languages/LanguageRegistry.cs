@@ -29,9 +29,9 @@ public class LanguageRegistry
     public ILanguage? Resolve(LanguageId id)
         => _byId.TryGetValue(id, out var lang) ? lang : null;
 
-    /// <summary>Resolve a specific tool directly — O(1) language + O(n tools) kind lookup.</summary>
-    public ITool? ResolveTool(string filePath, ToolKind kind)
-        => Resolve(filePath)?.GetTool(kind);
+    /// <summary>Resolve the first tool covering a capability for a given file path.</summary>
+    public ITool? ResolveTool(string filePath, ToolCapability capability)
+        => Resolve(filePath)?.GetTool(capability);
 
     public IReadOnlyList<ILanguage> All => [.. _byId.Values];
     public HashSet<string> SupportedExtensions { get; }
