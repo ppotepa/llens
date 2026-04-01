@@ -1,11 +1,10 @@
 using Llens.Caching;
-using Llens.Languages;
 using Llens.Models;
 using Llens.Tools;
 
 namespace Llens.Indexing;
 
-public class CodeIndexer(LanguageRegistry registry, ICodeMapCache cache, ILogger<CodeIndexer> logger) : ICodeIndexer
+public class CodeIndexer(ProjectRegistry projects, ICodeMapCache cache, ILogger<CodeIndexer> logger) : ICodeIndexer
 {
     public async Task IndexRepoAsync(RepoConfig repo, CancellationToken ct = default)
     {
@@ -15,9 +14,17 @@ public class CodeIndexer(LanguageRegistry registry, ICodeMapCache cache, ILogger
             return;
         }
 
+        var project = projects.Resolve(repo.Name);
+        if (project is null)
+        {
+            logger.LogWarning("No project registered for repo: {Name}", repo.Name);
+            return;
+        }
+
+        var extensions = project.Languages.SupportedExtensions;
         var files = Directory
             .EnumerateFiles(repo.Path, "*", SearchOption.AllDirectories)
-            .Where(f => repo.IncludeExtensions.Contains(Path.GetExtension(f)))
+            .Where(f => extensions.Contains(Path.GetExtension(f)))
             .Where(f => !repo.ExcludePaths.Any(ex => f.Contains(Path.DirectorySeparatorChar + ex + Path.DirectorySeparatorChar)));
 
         foreach (var file in files)
@@ -26,15 +33,16 @@ public class CodeIndexer(LanguageRegistry registry, ICodeMapCache cache, ILogger
             await IndexFileAsync(repo.Name, file, ct);
         }
 
-        logger.LogInformation("Indexed repo {Name}", repo.Name);
+        logger.LogInformation("Indexed project {Name}", repo.Name);
     }
 
     public async Task IndexFileAsync(string repoName, string filePath, CancellationToken ct = default)
     {
-        var language = registry.Resolve(filePath);
+        var project = projects.Resolve(repoName);
+        var language = project?.Languages.Resolve(filePath);
         if (language is null)
         {
-            logger.LogDebug("No language handler for {File}", filePath);
+            logger.LogDebug("No language handler for {File} in project {Repo}", filePath, repoName);
             return;
         }
 
