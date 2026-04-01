@@ -26,7 +26,7 @@ builder.Services.AddSingleton<ProjectRegistry>(sp =>
     return new ProjectRegistry(projects);
 });
 
-builder.Services.AddSingleton<ICodeMapCache, SqliteCodeMapCache>();
+builder.Services.AddSingleton<ICodeMapCache, InMemoryCodeMapCache>(); // swap to SqliteCodeMapCache when persistence is needed
 builder.Services.AddSingleton<ICodeIndexer, CodeIndexer>();
 builder.Services.AddHostedService<RepoWatcherService>();
 
