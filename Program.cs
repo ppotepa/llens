@@ -36,7 +36,6 @@ var app = builder.Build();
 
 app.UseStaticFiles();
 app.MapGet("/browse", () => Results.Redirect("/browse.html"));
-app.MapGet("/browse/", () => Results.Redirect("/browse.html"));
 
 app.MapGet("/health", (ProjectRegistry projects) => Results.Ok(new
 {
