@@ -22,5 +22,11 @@ public enum SymbolKind
     Property,
     Field,
     Enum,
+    // Rust
+    Function,
+    Struct,
+    Trait,
+    TraitImpl,
+    Module,
     Unknown
 }

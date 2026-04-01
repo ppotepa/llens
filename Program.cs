@@ -5,6 +5,7 @@ using Llens.Languages;
 using Llens.Languages.CSharp;
 using Llens.Languages.Rust;
 using Llens.Models;
+using Llens.Observability;
 using Llens.Scanning;
 using Llens.Watching;
 
@@ -30,6 +31,8 @@ builder.Services.AddSingleton<ProjectRegistry>(sp =>
 builder.Services.AddSingleton<IFileScanner, GitAwareFileScanner>();
 builder.Services.AddSingleton<ICodeMapCache, InMemoryCodeMapCache>(); // swap to SqliteCodeMapCache when persistence is needed
 builder.Services.AddSingleton<ICodeIndexer, CodeIndexer>();
+builder.Services.AddSingleton<QueryTelemetry>();
+builder.Services.AddSingleton<CompactSessionStore>();
 builder.Services.AddHostedService<RepoWatcherService>();
 
 var app = builder.Build();
@@ -46,5 +49,11 @@ app.MapGet("/health", (ProjectRegistry projects) => Results.Ok(new
 app.MapProjectRoutes();
 app.MapSymbolRoutes();
 app.MapFileRoutes();
+app.MapQueryRoutes();
+app.MapGraphRoutes();
+app.MapContextPackRoutes();
+app.MapCompactRoutes();
+app.MapCompactOpsRoutes();
+app.MapTelemetryRoutes();
 
 app.Run();

@@ -17,6 +17,8 @@ public interface ICodeMapCache
     Task<IEnumerable<CodeSymbol>> QueryImplementorsAsync(string symbolName, string? repoName = null, CancellationToken ct = default);
 
     // --- Reference queries ---
+    /// <summary>Remove all references that originate from a file before re-indexing that file.</summary>
+    Task RemoveReferencesInFileAsync(string filePath, CancellationToken ct = default);
     Task StoreReferencesAsync(IEnumerable<SymbolReference> references, CancellationToken ct = default);
 
     /// <summary>All usages of a symbol across the repo — replaces grepping for a name.</summary>

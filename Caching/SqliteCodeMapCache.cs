@@ -109,15 +109,36 @@ public class SqliteCodeMapCache : ICodeMapCache, IAsyncDisposable
 
     public Task<IEnumerable<CodeSymbol>> QueryImplementorsAsync(string symbolName, string? repoName = null, CancellationToken ct = default)
     {
-        // TODO: populate a base_type column during indexing for proper implementor tracking
-        // For now, returns classes/structs that share naming convention with the symbol
+        // Heuristic implementor detection using class/struct/trait-impl symbols and signatures.
+        // C# classes/interfaces carry base info in Signature; Rust trait impls are named "Trait for Type".
         var sql = repoName is null
-            ? "SELECT * FROM symbols WHERE kind IN (0, 1) AND name LIKE @pattern"
-            : "SELECT * FROM symbols WHERE kind IN (0, 1) AND name LIKE @pattern AND repo_name = @repoName";
-        return Task.FromResult(_db.Query<CodeSymbol>(sql, new { pattern = $"%{symbolName.TrimStart('I')}%", repoName }));
+            ? """
+              SELECT * FROM symbols
+              WHERE kind IN (0, 7, 9)
+                AND (name LIKE @pattern OR signature LIKE @pattern OR name LIKE @traitImplPattern)
+              """
+            : """
+              SELECT * FROM symbols
+              WHERE kind IN (0, 7, 9)
+                AND repo_name = @repoName
+                AND (name LIKE @pattern OR signature LIKE @pattern OR name LIKE @traitImplPattern)
+              """;
+        var needle = symbolName.Trim();
+        return Task.FromResult(_db.Query<CodeSymbol>(sql, new
+        {
+            pattern = $"%{needle}%",
+            traitImplPattern = $"{needle} for %",
+            repoName
+        }));
     }
 
     // --- References ---
+
+    public Task RemoveReferencesInFileAsync(string filePath, CancellationToken ct = default)
+    {
+        _db.Execute("DELETE FROM references_ WHERE in_file = @filePath", new { filePath });
+        return Task.CompletedTask;
+    }
 
     public Task StoreReferencesAsync(IEnumerable<SymbolReference> references, CancellationToken ct = default)
     {

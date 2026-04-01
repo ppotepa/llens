@@ -60,6 +60,19 @@
     font-size: 13px;
     cursor: pointer;
   }
+  #quick-fuzzy {
+    min-width: 320px;
+    max-width: 520px;
+    width: 42vw;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    outline: none;
+  }
+  #quick-fuzzy:focus { border-color: var(--accent); }
 
   .badge {
     font-size: 11px;
@@ -226,6 +239,150 @@
   .file-item .f-name { font-size: 13px; font-family: var(--font-mono); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .file-item .f-count { font-size: 11px; color: var(--muted); white-space: nowrap; }
 
+  /* ── Catalog ── */
+  #tab-catalog .search-box { border-bottom: 1px solid var(--border); }
+  #catalog-meta {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  #catalog-tree {
+    overflow-y: auto;
+    flex: 1;
+    padding: 8px 10px 16px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .catalog-folder {
+    margin: 2px 0;
+    border-left: 1px dotted #2f3740;
+    padding-left: 8px;
+  }
+  .catalog-folder > summary {
+    cursor: pointer;
+    color: var(--text);
+    list-style: none;
+    user-select: none;
+    padding: 3px 0;
+  }
+  .catalog-folder > summary::-webkit-details-marker { display: none; }
+  .catalog-folder-name { color: var(--text); }
+  .catalog-folder-meta { color: var(--muted); font-size: 11px; margin-left: 6px; }
+  .catalog-file {
+    all: unset;
+    display: flex;
+    width: 100%;
+    padding: 3px 0 3px 18px;
+    cursor: pointer;
+    color: var(--text);
+  }
+  .catalog-file:hover { color: var(--accent); }
+  .catalog-file-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .catalog-file-meta { color: var(--muted); font-size: 11px; margin-left: 8px; }
+
+  /* ── Graph ── */
+  .graph-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .graph-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .graph-row .btn { white-space: nowrap; }
+  .graph-toolbar select {
+    width: auto;
+    min-width: 88px;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  .graph-row-primary {
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .graph-row-actions {
+    padding-top: 2px;
+  }
+  #graph-canvas-wrap.panning { cursor: grabbing; }
+  .graph-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  #graph-meta {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  #graph-history {
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+  }
+  .graph-crumb {
+    display: inline-block;
+    margin-right: 8px;
+    color: #a9b4c2;
+    cursor: pointer;
+  }
+  .graph-crumb.active { color: var(--accent); }
+  #graph-canvas-wrap {
+    position: relative;
+    flex: 1;
+    background: radial-gradient(circle at 20% 15%, #10161e, #0d1117 60%);
+    overflow: hidden;
+  }
+  #graph-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .g-edge {
+    stroke: #364152;
+    stroke-width: 1.2;
+    opacity: 0.9;
+  }
+  .g-edge.contains { stroke: #4f8cff; }
+  .g-edge.imports { stroke: #e3b341; }
+  .g-edge.references { stroke: #56d364; }
+  .g-edge.callers { stroke: #7ee787; stroke-dasharray: 5 4; }
+  .g-edge.implements { stroke: #d2a8ff; stroke-dasharray: 3 3; }
+  .g-edge-label {
+    fill: #9ab4cf;
+    font-size: 10px;
+    font-family: var(--font-mono);
+    pointer-events: none;
+  }
+  .g-node { cursor: pointer; }
+  .g-node circle { stroke: #0b1220; stroke-width: 1.5; }
+  .g-node.selected circle { stroke: var(--accent); stroke-width: 3; }
+  .g-node.file circle { fill: #4f8cff; }
+  .g-node.symbol circle { fill: #56d364; }
+  .g-node.import circle { fill: #e3b341; }
+  .g-node text {
+    fill: var(--text);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    pointer-events: none;
+  }
+  .g-node .distance {
+    fill: #0d1117;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
   /* ── Detail pane ── */
   #detail {
     grid-area: detail;
@@ -306,6 +463,13 @@
   .loader { display: none; }
   .loader.active { display: block; color: var(--muted); font-size: 12px; padding: 8px 14px; }
 
+  @media (max-width: 1500px) {
+    .graph-row-actions .btn {
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+  }
+
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -316,6 +480,7 @@
 <header>
   <h1>llens <span>/ browse</span></h1>
   <select id="project-select"><option value="">loading...</option></select>
+  <input id="quick-fuzzy" type="text" placeholder="Fuzzy lookup: symbol, method, trait, file..." autocomplete="off">
   <span id="project-langs"></span>
   <span id="status">connecting...</span>
 </header>
@@ -333,6 +498,8 @@
 <main>
   <div class="tabs">
     <div class="tab active" data-tab="symbols">Symbols</div>
+    <div class="tab" data-tab="catalog">Catalog</div>
+    <div class="tab" data-tab="graph">Graph</div>
     <div class="tab" data-tab="files">File Detail</div>
     <div class="tab" data-tab="refs">References</div>
   </div>
@@ -352,6 +519,64 @@
       </select>
     </div>
     <div id="symbol-results"><div class="empty">Type to search symbols</div></div>
+  </div>
+
+  <!-- Catalog tab -->
+  <div class="tab-content" id="tab-catalog">
+    <div class="search-box">
+      <input type="text" id="catalog-search" placeholder="Filter files/folders..." autocomplete="off">
+    </div>
+    <div id="catalog-meta">Catalog is empty</div>
+    <div id="catalog-tree"><div class="empty">Select a project</div></div>
+  </div>
+
+  <!-- Graph tab -->
+  <div class="tab-content" id="tab-graph">
+    <div class="search-box graph-toolbar">
+      <div class="graph-row graph-row-primary">
+        <select id="graph-depth" title="Depth">
+          <option value="1">depth 1</option>
+          <option value="2" selected>depth 2</option>
+          <option value="3">depth 3</option>
+          <option value="4">depth 4</option>
+        </select>
+        <select id="graph-max-nodes" title="Max nodes">
+          <option value="80">80 nodes</option>
+          <option value="140" selected>140 nodes</option>
+          <option value="220">220 nodes</option>
+          <option value="320">320 nodes</option>
+        </select>
+        <select id="graph-direction" title="Direction">
+          <option value="both" selected>both</option>
+          <option value="out">out</option>
+          <option value="in">in</option>
+        </select>
+        <button class="btn" id="btn-graph-refresh">Run</button>
+      </div>
+      <div class="graph-row graph-row-toggles">
+        <label class="graph-check"><input type="checkbox" id="edge-contains" checked>contains</label>
+        <label class="graph-check"><input type="checkbox" id="edge-imports" checked>imports</label>
+        <label class="graph-check"><input type="checkbox" id="edge-references" checked>references</label>
+        <label class="graph-check"><input type="checkbox" id="edge-callers">callers</label>
+        <label class="graph-check"><input type="checkbox" id="edge-implements">implements</label>
+        <label class="graph-check"><input type="checkbox" id="edge-labels">edge labels</label>
+        <label class="graph-check"><input type="checkbox" id="graph-hide-import-stubs" checked>hide import stubs</label>
+      </div>
+      <div class="graph-row graph-row-actions">
+        <button class="btn" id="btn-graph-expand-out">Expand Out</button>
+        <button class="btn" id="btn-graph-expand-in">Expand In</button>
+        <button class="btn" id="btn-graph-expand-both">Expand Both</button>
+        <button class="btn" id="btn-graph-collapse">Collapse</button>
+        <button class="btn" id="btn-graph-back">Back</button>
+        <button class="btn" id="btn-graph-clear-history">Clear History</button>
+        <button class="btn" id="btn-graph-fit-focus">Fit Focus</button>
+        <button class="btn" id="btn-graph-fit-all">Fit All</button>
+        <button class="btn" id="btn-graph-reset">Reset View</button>
+      </div>
+    </div>
+    <div id="graph-meta">Select a file or symbol, then open Graph. Drag background to pan, wheel to zoom, double-click node to refocus.</div>
+    <div id="graph-history">Focus history: empty</div>
+    <div id="graph-canvas-wrap"><svg id="graph-svg"></svg></div>
   </div>
 
   <!-- File detail tab -->
@@ -380,12 +605,35 @@ const API = '';
 let currentProject = '';
 let currentSymbol  = null;
 let searchTimer    = null;
+let currentFiles   = [];
+let fuzzyController = null;
+const fuzzyCache = new Map();
+let currentSelection = null;
+let currentGraph = null;
+let graphState = createEmptyGraphState();
+let selectedGraphNodeId = null;
+let graphView = { x: 0, y: 0, scale: 1 };
+let graphPanState = null;
+let graphFocusHistory = [];
+let graphLastLayout = null;
+const graphExpandOffsets = new Map();
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 
 async function get(url) {
   const r = await fetch(API + url);
   if (!r.ok) throw new Error(r.statusText);
+  return r.json();
+}
+
+async function post(url, payload, signal) {
+  const r = await fetch(API + url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal
+  });
+  if (!r.ok) throw new Error(await r.text() || r.statusText);
   return r.json();
 }
 
@@ -397,6 +645,10 @@ function shortPath(p) {
   return parts.slice(-2).join('/');
 }
 
+function normalizePath(p) {
+  return (p || '').replaceAll('\\', '/');
+}
+
 function setStatus(msg, cls = '') {
   const el = document.getElementById('status');
   el.textContent = msg;
@@ -406,6 +658,7 @@ function setStatus(msg, cls = '') {
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${name}`));
+  if (name === 'graph') loadGraphForCurrentSelection();
 }
 
 // ── Projects ───────────────────────────────────────────────────────────────
@@ -448,6 +701,8 @@ async function loadFiles() {
   list.innerHTML = '<div class="loader active">Loading…</div>';
   try {
     const files = await get(`/api/files/?project=${encodeURIComponent(currentProject)}`);
+    currentFiles = files;
+    renderCatalog(files);
     if (!files.length) { list.innerHTML = '<div class="empty">No files indexed</div>'; return; }
 
     files.sort((a,b) => a.filePath.localeCompare(b.filePath));
@@ -474,9 +729,869 @@ async function loadFiles() {
 
 document.getElementById('btn-refresh-files').addEventListener('click', loadFiles);
 
+// ── Catalog tree ───────────────────────────────────────────────────────────
+
+function commonPathPrefix(paths) {
+  if (!paths.length) return '';
+  const split = paths.map(p => normalizePath(p).split('/').filter(Boolean));
+  const first = split[0];
+  let i = 0;
+  while (i < first.length && split.every(parts => parts[i] === first[i])) i++;
+  return i === 0 ? '' : first.slice(0, i).join('/') + '/';
+}
+
+function buildCatalogTree(files) {
+  const prefix = commonPathPrefix(files.map(f => f.filePath));
+  const root = { name: '', folders: new Map(), files: [] };
+
+  for (const f of files) {
+    const full = normalizePath(f.filePath);
+    const rel = full.startsWith(prefix) ? full.slice(prefix.length) : full;
+    const parts = rel.split('/').filter(Boolean);
+    if (!parts.length) continue;
+
+    const fileName = parts[parts.length - 1];
+    const dirs = parts.slice(0, -1);
+    let node = root;
+    for (const d of dirs) {
+      if (!node.folders.has(d)) node.folders.set(d, { name: d, folders: new Map(), files: [] });
+      node = node.folders.get(d);
+    }
+
+    node.files.push({
+      filePath: f.filePath,
+      language: f.language,
+      symbolCount: f.symbolCount,
+      name: fileName,
+      relPath: rel
+    });
+  }
+
+  return { root, prefix };
+}
+
+function renderFolder(node, query, depth) {
+  const folders = Array.from(node.folders.values()).sort((a, b) => a.name.localeCompare(b.name));
+  const files = [...node.files].sort((a, b) => a.name.localeCompare(b.name));
+
+  let fileCount = 0;
+  let symbolCount = 0;
+  let childrenHtml = '';
+
+  for (const folder of folders) {
+    const rendered = renderFolder(folder, query, depth + 1);
+    if (!rendered.visible) continue;
+    childrenHtml += rendered.html;
+    fileCount += rendered.fileCount;
+    symbolCount += rendered.symbolCount;
+  }
+
+  for (const file of files) {
+    const matches = !query || file.relPath.toLowerCase().includes(query) || file.name.toLowerCase().includes(query);
+    if (!matches) continue;
+    fileCount += 1;
+    symbolCount += file.symbolCount || 0;
+    const icon = file.language === 'Rust' ? '🦀' : '🔷';
+    childrenHtml += `
+      <button class="catalog-file" data-path="${encodeURIComponent(file.filePath)}" title="${file.filePath}">
+        <span class="catalog-file-name">${icon} ${file.name}</span>
+        <span class="catalog-file-meta">${file.symbolCount ?? 0}</span>
+      </button>
+    `;
+  }
+
+  const isRoot = depth === 0;
+  const visible = fileCount > 0;
+  if (!visible) return { visible: false, html: '', fileCount: 0, symbolCount: 0 };
+
+  if (isRoot) {
+    return { visible: true, html: childrenHtml, fileCount, symbolCount };
+  }
+
+  const open = depth <= 1 ? 'open' : '';
+  const html = `
+    <details class="catalog-folder" ${open}>
+      <summary>
+        <span class="catalog-folder-name">📁 ${node.name}</span>
+        <span class="catalog-folder-meta">${fileCount} files · ${symbolCount} symbols</span>
+      </summary>
+      ${childrenHtml}
+    </details>
+  `;
+  return { visible: true, html, fileCount, symbolCount };
+}
+
+function renderCatalog(files) {
+  const treeEl = document.getElementById('catalog-tree');
+  const metaEl = document.getElementById('catalog-meta');
+  const query = document.getElementById('catalog-search').value.trim().toLowerCase();
+
+  if (!files || !files.length) {
+    metaEl.textContent = 'Catalog is empty';
+    treeEl.innerHTML = '<div class="empty">No files indexed</div>';
+    return;
+  }
+
+  const { root } = buildCatalogTree(files);
+  const rendered = renderFolder(root, query, 0);
+  if (!rendered.visible) {
+    metaEl.textContent = 'No catalog entries match this filter';
+    treeEl.innerHTML = '<div class="empty">No matches</div>';
+    return;
+  }
+
+  metaEl.textContent = `${rendered.fileCount} files · ${rendered.symbolCount} symbols`;
+  treeEl.innerHTML = rendered.html;
+}
+
+document.getElementById('catalog-search').addEventListener('input', () => renderCatalog(currentFiles));
+
+document.getElementById('catalog-tree').addEventListener('click', e => {
+  const btn = e.target.closest('.catalog-file');
+  if (!btn) return;
+  const filePath = decodeURIComponent(btn.dataset.path);
+  loadFileDetail(filePath);
+  switchTab('files');
+});
+
+// ── Graph ──────────────────────────────────────────────────────────────────
+
+function selectedEdgeTypes() {
+  const types = [];
+  if (document.getElementById('edge-contains').checked) types.push('contains');
+  if (document.getElementById('edge-imports').checked) types.push('imports');
+  if (document.getElementById('edge-references').checked) types.push('references');
+  if (document.getElementById('edge-callers').checked) types.push('callers');
+  if (document.getElementById('edge-implements').checked) types.push('implements');
+  return types;
+}
+
+function setGraphMeta(msg) {
+  document.getElementById('graph-meta').textContent = msg;
+}
+
+function renderGraphHistory() {
+  const el = document.getElementById('graph-history');
+  if (!graphFocusHistory.length) {
+    el.textContent = 'Focus history: empty';
+    return;
+  }
+  const activeId = selectedGraphNodeId || graphState.focusNodeId;
+  el.innerHTML = `Focus history: ${graphFocusHistory.map(item =>
+    `<span class="graph-crumb ${item.id === activeId ? 'active' : ''}" data-node-id="${item.id}" title="${item.label}">${item.label}</span>`
+  ).join(' > ')}`;
+}
+
+function pushGraphHistory(node) {
+  if (!node || !node.id) return;
+  const last = graphFocusHistory[graphFocusHistory.length - 1];
+  if (last?.id === node.id) return;
+  graphFocusHistory.push({ id: node.id, label: node.label || node.id });
+  if (graphFocusHistory.length > 30) graphFocusHistory = graphFocusHistory.slice(-30);
+  renderGraphHistory();
+}
+
+function clearGraphCanvas(message) {
+  const svg = document.getElementById('graph-svg');
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  graphView = { x: 0, y: 0, scale: 1 };
+  graphLastLayout = null;
+  graphExpandOffsets.clear();
+  graphFocusHistory = [];
+  renderGraphHistory();
+  if (message) setGraphMeta(message);
+}
+
+function isGraphTabActive() {
+  return document.querySelector('.tab.active')?.dataset.tab === 'graph';
+}
+
+function createEmptyGraphState() {
+  return {
+    nodes: new Map(),
+    edges: new Map(),
+    nodeSources: new Map(),
+    edgeSources: new Map(),
+    rootSource: null,
+    focusNodeId: null
+  };
+}
+
+function addSource(map, key, source) {
+  if (!map.has(key)) map.set(key, new Set());
+  map.get(key).add(source);
+}
+
+function removeSource(map, key, source) {
+  if (!map.has(key)) return false;
+  const set = map.get(key);
+  set.delete(source);
+  if (!set.size) {
+    map.delete(key);
+    return true;
+  }
+  return false;
+}
+
+function edgeKey(e) {
+  return `${e.from}|${e.to}|${e.type}`;
+}
+
+function selectedGraphNode() {
+  return selectedGraphNodeId ? graphState.nodes.get(selectedGraphNodeId) : null;
+}
+
+function buildSeedFromSelection(selection) {
+  if (!selection) return null;
+  if (selection.type === 'file') return { type: 'file', path: selection.path };
+  if (selection.type === 'symbol') return { type: 'symbol', id: selection.id || '', name: selection.name || '' };
+  return null;
+}
+
+function buildSeedFromGraphNode(node) {
+  if (!node) return null;
+  const type = String(node.type || '').toLowerCase();
+  if (type === 'file' && node.filePath) return { type: 'file', path: node.filePath };
+  if (type === 'symbol') return { type: 'symbol', id: node.symbolId || '', name: node.label || '' };
+  return null;
+}
+
+async function fetchGraphNeighborhood(seed, direction, depth, maxNodes, includeSnippets) {
+  const edgeTypes = selectedEdgeTypes();
+  if (!edgeTypes.length) throw new Error('Select at least one edge type');
+  const payload = {
+    project: currentProject,
+    seed,
+    expand: {
+      edgeTypes,
+      direction,
+      depth,
+      maxNodes
+    },
+    include: {
+      snippets: includeSnippets,
+      radius: 6
+    }
+  };
+  return await post('/api/graph/query', payload);
+}
+
+function graphExpandKey(sourceId, direction, edgeTypes)
+    { return `${sourceId}|${direction}|${[...edgeTypes].sort().join(',')}`; }
+
+async function fetchGraphExpand(seed, direction, maxNodes, sourceId) {
+  const edgeTypes = selectedEdgeTypes();
+  if (!edgeTypes.length) throw new Error('Select at least one edge type');
+
+  const key = graphExpandKey(sourceId, direction, edgeTypes);
+  const offset = graphExpandOffsets.get(key) ?? 0;
+  const payload = {
+    project: currentProject,
+    seed,
+    edgeTypes,
+    direction,
+    depth: 1,
+    maxNodes,
+    excludeNodeIds: [...graphState.nodes.keys()],
+    excludeEdgeIds: [...graphState.edges.keys()],
+    page: { offset, limit: 180 }
+  };
+
+  const response = await post('/api/graph/expand', payload);
+  if (response.page?.hasMore && Number.isInteger(response.page?.nextOffset))
+    graphExpandOffsets.set(key, response.page.nextOffset);
+  else
+    graphExpandOffsets.delete(key);
+
+  return response;
+}
+
+function mergeGraphPayload(payload, sourceId) {
+  const nodes = payload.nodes || [];
+  const edges = payload.edges || [];
+
+  for (const n of nodes) {
+    const existing = graphState.nodes.get(n.id);
+    if (!existing) graphState.nodes.set(n.id, n);
+    else if (String(existing.type || '').toLowerCase() === 'import' && String(n.type || '').toLowerCase() !== 'import')
+      graphState.nodes.set(n.id, { ...existing, ...n });
+    addSource(graphState.nodeSources, n.id, sourceId);
+  }
+  for (const e of edges) {
+    const key = edgeKey(e);
+    if (!graphState.edges.has(key)) graphState.edges.set(key, e);
+    addSource(graphState.edgeSources, key, sourceId);
+  }
+
+  // Ensure edge endpoint nodes are retained
+  for (const e of edges) {
+    addSource(graphState.nodeSources, e.from, sourceId);
+    addSource(graphState.nodeSources, e.to, sourceId);
+  }
+}
+
+function pruneGraphAfterSourceRemoval() {
+  for (const [key, edge] of [...graphState.edges.entries()]) {
+    if (!graphState.edgeSources.has(key)) graphState.edges.delete(key);
+  }
+
+  // Keep nodes that still have any source.
+  for (const [id] of [...graphState.nodes.entries()]) {
+    if (!graphState.nodeSources.has(id)) graphState.nodes.delete(id);
+  }
+
+  // Guarantee root node remains when root source is active.
+  if (graphState.focusNodeId && !graphState.nodes.has(graphState.focusNodeId)) {
+    graphState.focusNodeId = graphState.nodes.keys().next().value ?? null;
+  }
+  if (selectedGraphNodeId && !graphState.nodes.has(selectedGraphNodeId)) {
+    selectedGraphNodeId = null;
+  }
+}
+
+function collapseSource(sourceId) {
+  if (!sourceId || sourceId === graphState.rootSource) return;
+  for (const key of [...graphExpandOffsets.keys()]) {
+    if (key.startsWith(`${sourceId}|`)) graphExpandOffsets.delete(key);
+  }
+  for (const key of [...graphState.edgeSources.keys()]) {
+    removeSource(graphState.edgeSources, key, sourceId);
+  }
+  for (const key of [...graphState.nodeSources.keys()]) {
+    removeSource(graphState.nodeSources, key, sourceId);
+  }
+  pruneGraphAfterSourceRemoval();
+  renderGraphFromState();
+}
+
+async function loadGraphForCurrentSelection() {
+  const seed = buildSeedFromSelection(currentSelection);
+  if (!seed) {
+    clearGraphCanvas('Select a file or symbol first');
+    return;
+  }
+
+  const depth = Number(document.getElementById('graph-depth').value || '2');
+  const maxNodes = Number(document.getElementById('graph-max-nodes').value || '140');
+  const direction = document.getElementById('graph-direction').value || 'both';
+
+  setGraphMeta('Building graph...');
+  try {
+    const graph = await fetchGraphNeighborhood(seed, direction, depth, maxNodes, true);
+    currentGraph = graph;
+    graphState = createEmptyGraphState();
+    graphView = { x: 0, y: 0, scale: 1 };
+    const rootSource = '__root__';
+    graphState.rootSource = rootSource;
+    graphState.focusNodeId = graph.seedId || graph.nodes?.[0]?.id || null;
+    mergeGraphPayload(graph, rootSource);
+    selectedGraphNodeId = graphState.focusNodeId;
+    graphExpandOffsets.clear();
+    graphFocusHistory = [];
+    if (selectedGraphNodeId && graphState.nodes.has(selectedGraphNodeId))
+      pushGraphHistory(graphState.nodes.get(selectedGraphNodeId));
+    renderGraphFromState();
+  } catch (e) {
+    clearGraphCanvas(`Graph error: ${e.message}`);
+  }
+}
+
+async function expandSelectedNode(direction = 'both') {
+  const node = selectedGraphNode();
+  if (!node) {
+    setGraphMeta('Select a node first');
+    return;
+  }
+
+  const seed = buildSeedFromGraphNode(node);
+  if (!seed) {
+    setGraphMeta('This node type cannot be expanded');
+    return;
+  }
+
+  const sourceId = `exp:${node.id}`;
+  const maxNodes = Number(document.getElementById('graph-max-nodes').value || '140');
+  try {
+    const graph = await fetchGraphExpand(seed, direction, maxNodes, sourceId);
+    mergeGraphPayload(graph, sourceId);
+    graphState.focusNodeId = node.id;
+    renderGraphFromState();
+    const page = graph.page;
+    if (page?.hasMore) {
+      setGraphMeta(`Expanded '${node.label}'. Partial page loaded (${page.offset + page.limit}/${page.totalEdges}); press expand again to continue.`);
+    }
+  } catch (e) {
+    setGraphMeta(`Expand failed: ${e.message}`);
+  }
+}
+
+function collapseSelectedNode() {
+  const node = selectedGraphNode();
+  if (!node) {
+    setGraphMeta('Select a node first');
+    return;
+  }
+  collapseSource(`exp:${node.id}`);
+}
+
+function computeDistances(nodes, edges, focusId) {
+  const dist = new Map();
+  if (!focusId) return dist;
+  const adj = new Map();
+  for (const n of nodes) adj.set(n.id, []);
+  for (const e of edges) {
+    if (!adj.has(e.from)) adj.set(e.from, []);
+    if (!adj.has(e.to)) adj.set(e.to, []);
+    adj.get(e.from).push(e.to);
+    adj.get(e.to).push(e.from);
+  }
+  const q = [focusId];
+  dist.set(focusId, 0);
+  while (q.length) {
+    const cur = q.shift();
+    const d = dist.get(cur);
+    for (const nxt of adj.get(cur) || []) {
+      if (dist.has(nxt)) continue;
+      dist.set(nxt, d + 1);
+      q.push(nxt);
+    }
+  }
+  return dist;
+}
+
+function computeGraphLayout(nodes, edges, focusId, width, height) {
+  const distances = computeDistances(nodes, edges, focusId);
+  let maxKnown = 0;
+  for (const d of distances.values()) maxKnown = Math.max(maxKnown, d);
+
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const baseRadius = Math.min(width, height) * 0.14;
+  const layerStep = Math.min(85, Math.max(54, Math.min(width, height) * 0.09));
+  const pos = new Map();
+
+  // Initial layered positions by BFS distance.
+  const byLayer = new Map();
+  for (const n of nodes) {
+    const d = distances.has(n.id) ? distances.get(n.id) : (maxKnown + 1);
+    if (!byLayer.has(d)) byLayer.set(d, []);
+    byLayer.get(d).push(n);
+  }
+
+  pos.set(focusId, { x: centerX, y: centerY });
+  const layers = [...byLayer.keys()].filter(d => d > 0).sort((a, b) => a - b);
+  for (const d of layers) {
+    const ring = byLayer.get(d).sort((a, b) => (a.label || '').localeCompare(b.label || ''));
+    const radius = baseRadius + layerStep * Math.min(d, 8);
+    for (let i = 0; i < ring.length; i++) {
+      const jitter = ((i % 2) * 0.12) - 0.06;
+      const angle = (2 * Math.PI * i) / Math.max(1, ring.length) + jitter;
+      pos.set(ring[i].id, {
+        x: centerX + Math.cos(angle) * radius,
+        y: centerY + Math.sin(angle) * radius
+      });
+    }
+  }
+
+  // Force refinement for readability while preserving layer intuition.
+  const nodeCount = nodes.length;
+  const iterations = nodeCount <= 120 ? 80 : (nodeCount <= 220 ? 58 : 42);
+  const repulsion = nodeCount <= 120 ? 9800 : 7200;
+  const spring = 0.024;
+  const layerPull = 0.028;
+  const damping = 0.72;
+  const maxStep = 11;
+  const padding = 38;
+
+  const nodeIndex = new Map(nodes.map((n, i) => [n.id, i]));
+  const edgePairs = [];
+  for (const e of edges) {
+    const ai = nodeIndex.get(e.from);
+    const bi = nodeIndex.get(e.to);
+    if (ai === undefined || bi === undefined) continue;
+    edgePairs.push([ai, bi]);
+  }
+
+  const vx = new Array(nodeCount).fill(0);
+  const vy = new Array(nodeCount).fill(0);
+  const arr = nodes.map(n => pos.get(n.id));
+
+  for (let it = 0; it < iterations; it++) {
+    const repulseStride = nodeCount > 220 && (it % 2 === 1) ? 2 : 1;
+
+    // Repulsion
+    for (let i = 0; i < nodeCount; i += repulseStride) {
+      const a = arr[i];
+      for (let j = i + 1; j < nodeCount; j += repulseStride) {
+        const b = arr[j];
+        let dx = a.x - b.x;
+        let dy = a.y - b.y;
+        const d2 = Math.max(24, dx * dx + dy * dy);
+        const force = repulsion / d2;
+        const d = Math.sqrt(d2);
+        dx /= d;
+        dy /= d;
+        vx[i] += dx * force;
+        vy[i] += dy * force;
+        vx[j] -= dx * force;
+        vy[j] -= dy * force;
+      }
+    }
+
+    // Spring attraction on edges
+    for (const [ai, bi] of edgePairs) {
+      const a = arr[ai];
+      const b = arr[bi];
+      let dx = b.x - a.x;
+      let dy = b.y - a.y;
+      const d = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+      const da = distances.get(nodes[ai].id) ?? (maxKnown + 1);
+      const db = distances.get(nodes[bi].id) ?? (maxKnown + 1);
+      const desired = 72 + Math.min(45, 18 * Math.abs(da - db));
+      const stretch = (d - desired) * spring;
+      dx /= d;
+      dy /= d;
+      vx[ai] += dx * stretch;
+      vy[ai] += dy * stretch;
+      vx[bi] -= dx * stretch;
+      vy[bi] -= dy * stretch;
+    }
+
+    // Pull nodes toward their BFS layer radius.
+    for (let i = 0; i < nodeCount; i++) {
+      const n = nodes[i];
+      if (n.id === focusId) continue;
+      const p = arr[i];
+      const d = distances.get(n.id) ?? (maxKnown + 1);
+      const desiredR = baseRadius + layerStep * Math.min(d, 8);
+      let dx = p.x - centerX;
+      let dy = p.y - centerY;
+      const r = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+      const diff = (r - desiredR) * layerPull;
+      dx /= r;
+      dy /= r;
+      vx[i] -= dx * diff;
+      vy[i] -= dy * diff;
+    }
+
+    // Integrate with damping and bounds.
+    for (let i = 0; i < nodeCount; i++) {
+      if (nodes[i].id === focusId) {
+        arr[i].x = centerX;
+        arr[i].y = centerY;
+        vx[i] = 0;
+        vy[i] = 0;
+        continue;
+      }
+      vx[i] *= damping;
+      vy[i] *= damping;
+      const sx = Math.max(-maxStep, Math.min(maxStep, vx[i]));
+      const sy = Math.max(-maxStep, Math.min(maxStep, vy[i]));
+      arr[i].x = Math.max(padding, Math.min(width - padding, arr[i].x + sx));
+      arr[i].y = Math.max(padding, Math.min(height - padding, arr[i].y + sy));
+    }
+  }
+
+  for (let i = 0; i < nodes.length; i++) pos.set(nodes[i].id, arr[i]);
+  const maxDepth = Math.max(...distances.values(), 0);
+  return { pos, distances, maxDepth };
+}
+
+function renderGraphFromState() {
+  const hideImportStubs = document.getElementById('graph-hide-import-stubs').checked;
+  const showEdgeLabels = document.getElementById('edge-labels').checked;
+  let nodes = [...graphState.nodes.values()];
+  let edges = [...graphState.edges.values()];
+  const svg = document.getElementById('graph-svg');
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  if (hideImportStubs) {
+    const hiddenImportIds = new Set(
+      nodes
+        .filter(n => String(n.type || '').toLowerCase() === 'import')
+        .map(n => n.id)
+    );
+    nodes = nodes.filter(n => !hiddenImportIds.has(n.id));
+    edges = edges.filter(e => !hiddenImportIds.has(e.from) && !hiddenImportIds.has(e.to));
+  }
+
+  if (!nodes.length) {
+    setGraphMeta('Graph is empty');
+    return;
+  }
+
+  const box = svg.getBoundingClientRect();
+  const width = Math.max(320, box.width || 800);
+  const height = Math.max(260, box.height || 520);
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+  const focusCandidate = selectedGraphNodeId || graphState.focusNodeId;
+  const focusId = nodes.some(n => n.id === focusCandidate) ? focusCandidate : nodes[0].id;
+  const { pos, distances, maxDepth } = computeGraphLayout(nodes, edges, focusId, width, height);
+  graphLastLayout = { pos, width, height, focusId };
+
+  const viewport = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  viewport.setAttribute('id', 'graph-viewport');
+  svg.appendChild(viewport);
+
+  const gEdges = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  viewport.appendChild(gEdges);
+  for (const e of edges) {
+    const a = pos.get(e.from);
+    const b = pos.get(e.to);
+    if (!a || !b) continue;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(a.x));
+    line.setAttribute('y1', String(a.y));
+    line.setAttribute('x2', String(b.x));
+    line.setAttribute('y2', String(b.y));
+    line.setAttribute('class', `g-edge ${e.type || ''}`);
+    const tip = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+    tip.textContent = `${e.type} | ${e.from} -> ${e.to}`;
+    line.appendChild(tip);
+    gEdges.appendChild(line);
+
+    if (showEdgeLabels) {
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', String((a.x + b.x) / 2));
+      label.setAttribute('y', String((a.y + b.y) / 2));
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('class', 'g-edge-label');
+      label.textContent = e.type || '';
+      gEdges.appendChild(label);
+    }
+  }
+
+  const gNodes = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  viewport.appendChild(gNodes);
+  for (const n of nodes) {
+    const p = pos.get(n.id);
+    if (!p) continue;
+    const cls = String(n.type || '').toLowerCase();
+    const selected = n.id === selectedGraphNodeId ? ' selected' : '';
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', `g-node ${cls}${selected}`);
+    g.setAttribute('transform', `translate(${p.x},${p.y})`);
+    g.setAttribute('data-id', n.id);
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('r', n.id === focusId ? '18' : '14');
+    g.appendChild(circle);
+
+    const dist = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    dist.setAttribute('text-anchor', 'middle');
+    dist.setAttribute('class', 'distance');
+    dist.setAttribute('dy', '3');
+    dist.textContent = String(distances.get(n.id) ?? '?');
+    g.appendChild(dist);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('dy', '-24');
+    label.textContent = (n.label || '').length > 24 ? `${n.label.slice(0, 24)}…` : n.label;
+    g.appendChild(label);
+
+    g.addEventListener('click', () => onGraphNodeClick(n));
+    g.addEventListener('dblclick', (ev) => {
+      ev.stopPropagation();
+      selectedGraphNodeId = n.id;
+      graphState.focusNodeId = n.id;
+      expandSelectedNode('both');
+    });
+    gNodes.appendChild(g);
+  }
+
+  applyGraphTransform();
+  const selected = selectedGraphNode();
+  const selectedText = selected ? ` · selected: ${selected.label}` : '';
+  setGraphMeta(`${nodes.length} nodes · ${edges.length} edges · depth ${maxDepth}${selectedText}`);
+}
+
+function fitGraphToPositions(points, focusOnly = false) {
+  if (!points.length || !graphLastLayout) return;
+  const margin = 42;
+  const width = graphLastLayout.width;
+  const height = graphLastLayout.height;
+  const minX = Math.min(...points.map(p => p.x));
+  const maxX = Math.max(...points.map(p => p.x));
+  const minY = Math.min(...points.map(p => p.y));
+  const maxY = Math.max(...points.map(p => p.y));
+  const bboxW = Math.max(1, maxX - minX);
+  const bboxH = Math.max(1, maxY - minY);
+  let scale = Math.min((width - margin * 2) / bboxW, (height - margin * 2) / bboxH);
+  if (!Number.isFinite(scale) || scale <= 0) scale = 1;
+  if (focusOnly) scale = Math.max(scale, 1.35);
+  graphView.scale = clampGraphScale(scale);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  graphView.x = width / 2 - graphView.scale * cx;
+  graphView.y = height / 2 - graphView.scale * cy;
+  applyGraphTransform();
+}
+
+function fitAllGraph() {
+  if (!graphLastLayout) return;
+  fitGraphToPositions([...graphLastLayout.pos.values()]);
+}
+
+function fitFocusGraph() {
+  if (!graphLastLayout) return;
+  const focus = graphLastLayout.pos.get(graphLastLayout.focusId);
+  if (!focus) return;
+  fitGraphToPositions([focus], true);
+}
+
+function applyGraphTransform() {
+  const viewport = document.getElementById('graph-viewport');
+  if (!viewport) return;
+  viewport.setAttribute('transform', `translate(${graphView.x} ${graphView.y}) scale(${graphView.scale})`);
+}
+
+function clampGraphScale(value) {
+  return Math.max(0.35, Math.min(2.8, value));
+}
+
+function getSvgPoint(svg, clientX, clientY) {
+  const pt = svg.createSVGPoint();
+  pt.x = clientX;
+  pt.y = clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function refocusGraphOnNode(node) {
+  selectedGraphNodeId = node.id;
+  graphState.focusNodeId = node.id;
+  pushGraphHistory(node);
+  renderGraphFromState();
+}
+
+function onGraphNodeClick(node) {
+  selectedGraphNodeId = node.id;
+  graphState.focusNodeId = node.id;
+  pushGraphHistory(node);
+  renderGraphFromState();
+
+  if ((node.type || '').toLowerCase() === 'file' && node.filePath) {
+    loadFileDetail(node.filePath, { skipGraphSync: true });
+    return;
+  }
+  if ((node.type || '').toLowerCase() === 'symbol' && node.filePath) {
+    loadSymbolDetail({
+      id: node.symbolId || '',
+      filePath: node.filePath,
+      lineStart: node.lineStart || 1,
+      name: node.label || 'symbol'
+    }, { skipGraphSync: true });
+  }
+}
+
+document.getElementById('btn-graph-refresh').addEventListener('click', loadGraphForCurrentSelection);
+document.getElementById('btn-graph-expand-out').addEventListener('click', () => expandSelectedNode('out'));
+document.getElementById('btn-graph-expand-in').addEventListener('click', () => expandSelectedNode('in'));
+document.getElementById('btn-graph-expand-both').addEventListener('click', () => expandSelectedNode('both'));
+document.getElementById('btn-graph-collapse').addEventListener('click', collapseSelectedNode);
+document.getElementById('btn-graph-back').addEventListener('click', () => {
+  if (graphFocusHistory.length < 2) return;
+  graphFocusHistory.pop();
+  const prev = graphFocusHistory[graphFocusHistory.length - 1];
+  const node = graphState.nodes.get(prev.id);
+  if (!node) return;
+  selectedGraphNodeId = node.id;
+  graphState.focusNodeId = node.id;
+  renderGraphHistory();
+  renderGraphFromState();
+});
+document.getElementById('btn-graph-clear-history').addEventListener('click', () => {
+  graphFocusHistory = [];
+  const node = selectedGraphNode();
+  if (node) pushGraphHistory(node);
+  else renderGraphHistory();
+});
+document.getElementById('btn-graph-fit-all').addEventListener('click', fitAllGraph);
+document.getElementById('btn-graph-fit-focus').addEventListener('click', fitFocusGraph);
+document.getElementById('btn-graph-reset').addEventListener('click', () => {
+  graphView = { x: 0, y: 0, scale: 1 };
+  applyGraphTransform();
+});
+document.getElementById('graph-depth').addEventListener('change', () => { if (isGraphTabActive()) loadGraphForCurrentSelection(); });
+document.getElementById('graph-max-nodes').addEventListener('change', () => { if (isGraphTabActive()) loadGraphForCurrentSelection(); });
+document.getElementById('graph-direction').addEventListener('change', () => { if (isGraphTabActive()) loadGraphForCurrentSelection(); });
+document.getElementById('edge-contains').addEventListener('change', () => { if (isGraphTabActive()) loadGraphForCurrentSelection(); });
+document.getElementById('edge-imports').addEventListener('change', () => { if (isGraphTabActive()) loadGraphForCurrentSelection(); });
+document.getElementById('edge-references').addEventListener('change', () => { if (isGraphTabActive()) loadGraphForCurrentSelection(); });
+document.getElementById('edge-callers').addEventListener('change', () => { if (isGraphTabActive()) loadGraphForCurrentSelection(); });
+document.getElementById('edge-implements').addEventListener('change', () => { if (isGraphTabActive()) loadGraphForCurrentSelection(); });
+document.getElementById('edge-labels').addEventListener('change', () => { if (isGraphTabActive() && graphState.nodes.size) renderGraphFromState(); });
+document.getElementById('graph-hide-import-stubs').addEventListener('change', () => { if (isGraphTabActive() && graphState.nodes.size) renderGraphFromState(); });
+window.addEventListener('resize', () => { if (isGraphTabActive() && graphState.nodes.size) renderGraphFromState(); });
+
+const graphSvg = document.getElementById('graph-svg');
+const graphWrap = document.getElementById('graph-canvas-wrap');
+document.getElementById('graph-history').addEventListener('click', (e) => {
+  const crumb = e.target.closest('.graph-crumb');
+  if (!crumb) return;
+  const id = crumb.dataset.nodeId;
+  const node = graphState.nodes.get(id);
+  if (!node) return;
+  selectedGraphNodeId = node.id;
+  graphState.focusNodeId = node.id;
+  pushGraphHistory(node);
+  renderGraphFromState();
+});
+graphSvg.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const before = getSvgPoint(graphSvg, e.clientX, e.clientY);
+  const factor = e.deltaY < 0 ? 1.09 : 0.92;
+  const newScale = clampGraphScale(graphView.scale * factor);
+  const afterScale = newScale / graphView.scale;
+  graphView.x = before.x - (before.x - graphView.x) * afterScale;
+  graphView.y = before.y - (before.y - graphView.y) * afterScale;
+  graphView.scale = newScale;
+  applyGraphTransform();
+}, { passive: false });
+
+graphSvg.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (e.target.closest('.g-node')) return;
+  graphPanState = { x: e.clientX, y: e.clientY, startX: graphView.x, startY: graphView.y };
+  graphWrap.classList.add('panning');
+});
+window.addEventListener('mousemove', (e) => {
+  if (!graphPanState) return;
+  const dx = e.clientX - graphPanState.x;
+  const dy = e.clientY - graphPanState.y;
+  graphView.x = graphPanState.startX + dx;
+  graphView.y = graphPanState.startY + dy;
+  applyGraphTransform();
+});
+window.addEventListener('mouseup', () => {
+  graphPanState = null;
+  graphWrap.classList.remove('panning');
+});
+
+window.addEventListener('keydown', (e) => {
+  if (!isGraphTabActive()) return;
+  const tag = (e.target?.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+  const key = e.key.toLowerCase();
+  if (key === 'e') { e.preventDefault(); expandSelectedNode('both'); return; }
+  if (key === 'o') { e.preventDefault(); expandSelectedNode('out'); return; }
+  if (key === 'i') { e.preventDefault(); expandSelectedNode('in'); return; }
+  if (key === 'x' || key === 'c') { e.preventDefault(); collapseSelectedNode(); return; }
+  if (key === 'b') { e.preventDefault(); document.getElementById('btn-graph-back').click(); return; }
+  if (key === 'f') { e.preventDefault(); fitAllGraph(); return; }
+  if (key === 'g') { e.preventDefault(); fitFocusGraph(); return; }
+});
+
 // ── File detail ────────────────────────────────────────────────────────────
 
-async function loadFileDetail(filePath) {
+async function loadFileDetail(filePath, options = {}) {
+  currentSelection = { type: 'file', path: filePath, name: shortPath(filePath) };
+  if (isGraphTabActive() && !options.skipGraphSync) loadGraphForCurrentSelection();
+
   const tab = document.getElementById('file-results');
   tab.innerHTML = '<div class="loader active">Loading…</div>';
 
@@ -573,54 +1688,123 @@ async function searchSymbols(q) {
 
   try {
     const kind = document.getElementById('sym-kind').value;
-    const url = kind && !q
-      ? `/api/symbols/search?q=&project=${encodeURIComponent(currentProject)}&kind=${kind}`
-      : `/api/symbols/search?q=${encodeURIComponent(q)}&project=${encodeURIComponent(currentProject)}${kind ? `&kind=${kind}` : ''}`;
+    const cacheKey = `${currentProject}|${kind}|${q.trim().toLowerCase()}`;
+    const cached = fuzzyCache.get(cacheKey);
+    if (cached) {
+      renderFuzzyResults(cached, results);
+      return;
+    }
 
-    const symbols = await get(url);
+    if (fuzzyController) fuzzyController.abort();
+    fuzzyController = new AbortController();
 
-    if (!symbols.length) { results.innerHTML = '<div class="empty">No results</div>'; return; }
+    const payload = {
+      project: currentProject,
+      mode: 'fuzzy',
+      query: q,
+      filters: kind ? { kind: [kind] } : undefined,
+      limit: 40,
+      snippetRadius: 8
+    };
+    const response = await post('/api/query', payload, fuzzyController.signal);
+    fuzzyCache.set(cacheKey, response);
+    renderFuzzyResults(response, results);
+    setStatus(`● ${response.summary || 'fuzzy lookup ready'}`, 'ok');
+  } catch(e) {
+    if (e?.name === 'AbortError') return;
+    results.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+    setStatus('✕ fuzzy lookup failed', 'err');
+  }
+}
 
-    results.innerHTML = symbols.map(s => `
+function renderFuzzyResults(response, resultsEl) {
+  const symbols = response.symbols || [];
+  const snippets = response.snippets || [];
+  if (!symbols.length && !snippets.length) {
+    resultsEl.innerHTML = '<div class="empty">No results</div>';
+    return;
+  }
+
+  const symHtml = symbols.map(s => {
+    const kind = Number.parseInt(s.kind, 10);
+    const cls = Number.isNaN(kind) ? 'kind-6' : kindClass(kind);
+    const label = Number.isNaN(kind) ? (s.kind || 'Unknown') : kindName(kind);
+    return `
       <div class="result-item" data-id="${s.id}" data-line="${s.lineStart}"
            data-path="${s.filePath}" data-name="${s.name}">
-        <span class="kind-tag ${kindClass(s.kind)}">${kindName(s.kind)}</span>
+        <span class="kind-tag ${cls}">${label}</span>
         <div>
           <div class="sym-name">${s.name}</div>
           ${s.signature ? `<div class="sym-sig">${s.signature}</div>` : ''}
         </div>
-        <span class="sym-path">${shortPath(s.filePath)}:${s.lineStart}</span>
+        <span class="sym-path">${shortPath(s.filePath)}:${s.lineStart} · score ${s.score ?? 0}</span>
       </div>
-    `).join('');
+    `;
+  }).join('');
 
-    results.querySelectorAll('.result-item').forEach(el => {
-      el.addEventListener('click', () => {
-        results.querySelectorAll('.result-item').forEach(x => x.classList.remove('active'));
-        el.classList.add('active');
-        loadSymbolDetail({ id: el.dataset.id, filePath: el.dataset.path,
-          lineStart: +el.dataset.line, name: el.dataset.name });
+  const snipHtml = snippets.slice(0, 10).map(s => `
+    <div class="ref-item" data-path="${s.filePath}" data-line="${s.matchLine}">
+      <div class="ref-file">${shortPath(s.filePath)}:${s.matchLine}</div>
+      <div class="ref-ctx">${(s.context || '').split('\n')[0] || ''}</div>
+    </div>
+  `).join('');
+
+  resultsEl.innerHTML = `
+    ${symHtml || ''}
+    ${snipHtml ? `<div class="detail-section"><h3>Snippet matches</h3>${snipHtml}</div>` : ''}
+  `;
+
+  resultsEl.querySelectorAll('.result-item').forEach(el => {
+    el.addEventListener('click', () => {
+      resultsEl.querySelectorAll('.result-item').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+      loadSymbolDetail({
+        id: el.dataset.id,
+        filePath: el.dataset.path,
+        lineStart: +el.dataset.line,
+        name: el.dataset.name
       });
     });
-  } catch(e) {
-    results.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
-  }
+  });
+
+  resultsEl.querySelectorAll('.ref-item').forEach(el => {
+    el.addEventListener('click', () => {
+      loadSymbolDetail({
+        id: '',
+        filePath: el.dataset.path,
+        lineStart: +(el.dataset.line || '1'),
+        name: shortPath(el.dataset.path)
+      });
+    });
+  });
 }
 
 document.getElementById('sym-search').addEventListener('input', e => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => searchSymbols(e.target.value.trim()), 250);
+  searchTimer = setTimeout(() => searchSymbols(e.target.value.trim()), 140);
 });
 
 document.getElementById('sym-kind').addEventListener('change', () => {
   searchSymbols(document.getElementById('sym-search').value.trim());
 });
 
+document.getElementById('quick-fuzzy').addEventListener('input', e => {
+  const q = e.target.value.trim();
+  document.getElementById('sym-search').value = q;
+  switchTab('symbols');
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => searchSymbols(q), 120);
+});
+
 // ── Symbol detail ──────────────────────────────────────────────────────────
 
-async function loadSymbolDetail(sym) {
+async function loadSymbolDetail(sym, options = {}) {
   currentSymbol = sym;
+  currentSelection = { type: 'symbol', id: sym.id, path: sym.filePath, name: sym.name, lineStart: sym.lineStart };
+  if (isGraphTabActive() && !options.skipGraphSync) loadGraphForCurrentSelection();
+
   document.getElementById('detail-label').textContent = sym.name;
-  document.getElementById('btn-refs').style.display = '';
+  document.getElementById('btn-refs').style.display = sym.id ? '' : 'none';
 
   const body = document.getElementById('detail-body');
   body.innerHTML = `
@@ -667,10 +1851,17 @@ document.getElementById('btn-refs').addEventListener('click', async () => {
 function clearDetail() {
   document.getElementById('detail-label').textContent = 'Nothing selected';
   document.getElementById('btn-refs').style.display = 'none';
+  currentSelection = null;
+  currentGraph = null;
+  graphState = createEmptyGraphState();
+  selectedGraphNodeId = null;
   document.getElementById('detail-body').innerHTML = '<div class="empty" style="padding-top:60px">Select a symbol or file</div>';
   document.getElementById('symbol-results').innerHTML = '<div class="empty">Type to search symbols</div>';
   document.getElementById('file-results').innerHTML  = '<div class="empty">Select a file from the sidebar</div>';
   document.getElementById('ref-results').innerHTML   = '<div class="empty">Click a symbol to see references</div>';
+  clearGraphCanvas('Select a file or symbol, then open Graph');
+  document.getElementById('catalog-search').value    = '';
+  renderCatalog(currentFiles);
 }
 
 document.querySelectorAll('.tab').forEach(t =>

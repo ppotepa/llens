@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Example App Store</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>Example App Store</h1>
+    <p>Products, categories, and stock in one small demo.</p>
+  </header>
+
+  <main class="layout">
+    <aside class="panel">
+      <h2>Categories</h2>
+      <ul id="category-list" class="list"></ul>
+    </aside>
+
+    <section class="panel grow">
+      <div class="toolbar">
+        <input id="search-input" type="search" placeholder="Search products..." />
+        <select id="sort-select">
+          <option value="name">Sort: Name</option>
+          <option value="price-asc">Sort: Price (Low)</option>
+          <option value="price-desc">Sort: Price (High)</option>
+          <option value="stock">Sort: Stock</option>
+        </select>
+      </div>
+      <div id="products-grid" class="grid"></div>
+    </section>
+
+    <aside class="panel">
+      <h2>Cart</h2>
+      <ul id="cart-list" class="list"></ul>
+      <p id="cart-total" class="total">Total: $0.00</p>
+    </aside>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>

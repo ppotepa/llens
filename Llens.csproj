@@ -13,4 +13,10 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Example projects are indexing fixtures, not part of the Llens app assembly. -->
+    <Compile Remove="example-projects/**/*.cs" />
+    <Compile Remove="Llens.Tests/**/*.cs" />
+  </ItemGroup>
+
 </Project>

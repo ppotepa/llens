@@ -50,11 +50,35 @@ public class InMemoryCodeMapCache : ICodeMapCache
 
     public Task<IEnumerable<CodeSymbol>> QueryImplementorsAsync(string symbolName, string? repoName = null, CancellationToken ct = default)
     {
-        // TODO: needs base_type tracking from indexer — placeholder for now
-        return Task.FromResult(Enumerable.Empty<CodeSymbol>());
+        var needle = symbolName.Trim();
+        var results = AllSymbols()
+            .Where(s => repoName is null || s.RepoName == repoName)
+            .Where(s =>
+                s.Kind is SymbolKind.Class or SymbolKind.Struct or SymbolKind.TraitImpl
+                && (
+                    s.Name.Contains(needle, StringComparison.OrdinalIgnoreCase)
+                    || (!string.IsNullOrWhiteSpace(s.Signature) && s.Signature.Contains(needle, StringComparison.OrdinalIgnoreCase))
+                    || (s.Kind == SymbolKind.TraitImpl && s.Name.StartsWith($"{needle} for ", StringComparison.OrdinalIgnoreCase))
+                ));
+        return Task.FromResult(results);
     }
 
     // --- References ---
+
+    public Task RemoveReferencesInFileAsync(string filePath, CancellationToken ct = default)
+    {
+        foreach (var key in _referencesBySymbol.Keys)
+        {
+            if (!_referencesBySymbol.TryGetValue(key, out var refs))
+                continue;
+
+            refs.RemoveAll(r => r.InFilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase));
+            if (refs.Count == 0)
+                _referencesBySymbol.TryRemove(key, out _);
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task StoreReferencesAsync(IEnumerable<SymbolReference> references, CancellationToken ct = default)
     {
