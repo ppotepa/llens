@@ -3,11 +3,11 @@ using Llens.Languages;
 namespace Llens.Tools;
 
 /// <summary>
-/// Non-generic base — used by the registry to handle tools polymorphically.
+/// Non-generic base — used by the registry and indexer to handle tools polymorphically.
 /// </summary>
 public interface ITool
 {
-    string Name { get; }
+    ToolKind Kind { get; }
     ToolPurpose Purpose { get; }
     Task<ToolResult> ExecuteAsync(ToolContext context, CancellationToken ct = default);
 }

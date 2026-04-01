@@ -20,7 +20,7 @@ public static class ProjectEndpoints
                 {
                     l.Name,
                     l.Extensions,
-                    tools = l.Tools.Select(t => new { t.Name, purpose = t.Purpose.ToString() })
+                    tools = l.Tools.Select(t => new { kind = t.Kind.ToString(), purpose = t.Purpose.ToString() })
                 })
             });
             return Results.Ok(summary);

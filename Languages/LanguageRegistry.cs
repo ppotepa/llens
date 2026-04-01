@@ -1,18 +1,38 @@
+using Llens.Tools;
+
 namespace Llens.Languages;
 
+/// <summary>
+/// Per-project registry. All lookups are O(1) via dictionary — no linear scans.
+/// </summary>
 public class LanguageRegistry
 {
-    private readonly IReadOnlyList<ILanguage> _languages;
+    private readonly IReadOnlyDictionary<LanguageId, ILanguage> _byId;
+    private readonly IReadOnlyDictionary<string, ILanguage> _byExtension;
 
     public LanguageRegistry(IEnumerable<ILanguage> languages)
     {
-        _languages = [.. languages];
-        SupportedExtensions = _languages.SelectMany(l => l.Extensions).ToHashSet();
+        var list = languages.ToList();
+        _byId = list.ToDictionary(l => l.Id);
+        _byExtension = list
+            .SelectMany(l => l.Extensions.Select(ext => (ext, l)))
+            .ToDictionary(x => x.ext, x => x.l, StringComparer.OrdinalIgnoreCase);
+
+        SupportedExtensions = _byExtension.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>Resolve language by file extension — O(1).</summary>
     public ILanguage? Resolve(string filePath)
-        => _languages.FirstOrDefault(l => l.CanHandle(filePath));
+        => _byExtension.TryGetValue(Path.GetExtension(filePath), out var lang) ? lang : null;
 
-    public IReadOnlyList<ILanguage> All => _languages;
+    /// <summary>Resolve language by id — O(1).</summary>
+    public ILanguage? Resolve(LanguageId id)
+        => _byId.TryGetValue(id, out var lang) ? lang : null;
+
+    /// <summary>Resolve a specific tool directly — O(1) language + O(n tools) kind lookup.</summary>
+    public ITool? ResolveTool(string filePath, ToolKind kind)
+        => Resolve(filePath)?.GetTool(kind);
+
+    public IReadOnlyList<ILanguage> All => [.. _byId.Values];
     public HashSet<string> SupportedExtensions { get; }
 }

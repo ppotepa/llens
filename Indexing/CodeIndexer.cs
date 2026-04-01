@@ -46,17 +46,20 @@ public class CodeIndexer(ProjectRegistry projects, ICodeMapCache cache, ILogger<
             return;
         }
 
-        var indexingTools = language.Tools.Where(t => t.Purpose == ToolPurpose.Indexing);
         var context = new ToolContext(repoName, filePath);
         var allSymbols = new List<CodeSymbol>();
+        var allImports = new List<string>();
 
-        foreach (var tool in indexingTools)
+        foreach (var tool in language.GetTools(ToolPurpose.Indexing))
         {
             var result = await tool.ExecuteAsync(context, ct);
             if (result.Success)
+            {
                 allSymbols.AddRange(result.Symbols);
+                allImports.AddRange(result.Imports);
+            }
             else
-                logger.LogWarning("Tool {Tool} failed on {File}: {Error}", tool.Name, filePath, result.Error);
+                logger.LogWarning("[{Kind}] failed on {File}: {Error}", tool.Kind, filePath, result.Error);
         }
 
         await cache.StoreSymbolsAsync(filePath, allSymbols, ct);
@@ -65,6 +68,7 @@ public class CodeIndexer(ProjectRegistry projects, ICodeMapCache cache, ILogger<
             FilePath = filePath,
             RepoName = repoName,
             Language = language.Name,
+            Imports = [.. allImports.Distinct()],
             SymbolCount = allSymbols.Count,
             LastIndexedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         }, ct);

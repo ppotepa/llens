@@ -2,12 +2,9 @@ using Llens.Tools;
 
 namespace Llens.Languages.Rust;
 
-/// <summary>
-/// Invokes a Rust binary (syn-shim) that parses .rs files and returns symbols as JSON.
-/// </summary>
 public class SynShimTool : ITool<Rust>
 {
-    public string Name => "syn-shim";
+    public ToolKind Kind => ToolKind.SynShim;
     public ToolPurpose Purpose => ToolPurpose.Indexing;
 
     public async Task<ToolResult> ExecuteAsync(ToolContext context, CancellationToken ct = default)

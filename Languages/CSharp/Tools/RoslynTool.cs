@@ -5,12 +5,9 @@ using Llens.Models;
 
 namespace Llens.Languages.CSharp;
 
-/// <summary>
-/// Roslyn-based indexing tool for C# files. Replaces the old RoslynIndexer.
-/// </summary>
 public class RoslynTool : ITool<CSharp>
 {
-    public string Name => "roslyn";
+    public ToolKind Kind => ToolKind.Roslyn;
     public ToolPurpose Purpose => ToolPurpose.Indexing;
 
     public async Task<ToolResult> ExecuteAsync(ToolContext context, CancellationToken ct = default)
@@ -19,17 +16,25 @@ public class RoslynTool : ITool<CSharp>
         var tree = CSharpSyntaxTree.ParseText(source, cancellationToken: ct);
         var root = await tree.GetRootAsync(ct);
 
-        var symbols = root.DescendantNodes().SelectMany<Microsoft.CodeAnalysis.SyntaxNode, CodeSymbol>(node => node switch
-        {
-            ClassDeclarationSyntax c     => [Make(context, c.Identifier.Text, SymbolKind.Class, c)],
-            InterfaceDeclarationSyntax i => [Make(context, i.Identifier.Text, SymbolKind.Interface, i)],
-            MethodDeclarationSyntax m    => [Make(context, m.Identifier.Text, SymbolKind.Method, m, m.ToString().Split('\n')[0].Trim())],
-            PropertyDeclarationSyntax p  => [Make(context, p.Identifier.Text, SymbolKind.Property, p)],
-            EnumDeclarationSyntax e      => [Make(context, e.Identifier.Text, SymbolKind.Enum, e)],
-            _                            => []
-        }).ToList();
+        var symbols = root.DescendantNodes()
+            .SelectMany<Microsoft.CodeAnalysis.SyntaxNode, CodeSymbol>(node => node switch
+            {
+                ClassDeclarationSyntax c     => [Make(context, c.Identifier.Text, SymbolKind.Class, c)],
+                InterfaceDeclarationSyntax i => [Make(context, i.Identifier.Text, SymbolKind.Interface, i)],
+                MethodDeclarationSyntax m    => [Make(context, m.Identifier.Text, SymbolKind.Method, m, m.ToString().Split('\n')[0].Trim())],
+                PropertyDeclarationSyntax p  => [Make(context, p.Identifier.Text, SymbolKind.Property, p)],
+                EnumDeclarationSyntax e      => [Make(context, e.Identifier.Text, SymbolKind.Enum, e)],
+                _                            => []
+            })
+            .ToList();
 
-        return ToolResult.Ok(symbols);
+        var imports = root.DescendantNodes()
+            .OfType<UsingDirectiveSyntax>()
+            .Select(u => u.Name?.ToString())
+            .OfType<string>()
+            .ToArray();
+
+        return ToolResult.Ok(symbols, imports);
     }
 
     private static CodeSymbol Make(
