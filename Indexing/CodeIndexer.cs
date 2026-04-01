@@ -8,9 +8,9 @@ public class CodeIndexer(ProjectRegistry projects, ICodeMapCache cache, ILogger<
 {
     public async Task IndexRepoAsync(RepoConfig repo, CancellationToken ct = default)
     {
-        if (!Directory.Exists(repo.Path))
+        if (!Directory.Exists(repo.ResolvedPath))
         {
-            logger.LogWarning("Repo path does not exist: {Path}", repo.Path);
+            logger.LogWarning("Repo path does not exist: {Path}", repo.ResolvedPath);
             return;
         }
 
@@ -23,7 +23,7 @@ public class CodeIndexer(ProjectRegistry projects, ICodeMapCache cache, ILogger<
 
         var extensions = project.Languages.SupportedExtensions;
         var files = Directory
-            .EnumerateFiles(repo.Path, "*", SearchOption.AllDirectories)
+            .EnumerateFiles(repo.ResolvedPath, "*", SearchOption.AllDirectories)
             .Where(f => extensions.Contains(Path.GetExtension(f)))
             .Where(f => !repo.ExcludePaths.Any(ex => f.Contains(Path.DirectorySeparatorChar + ex + Path.DirectorySeparatorChar)));
 
@@ -59,8 +59,17 @@ public class CodeIndexer(ProjectRegistry projects, ICodeMapCache cache, ILogger<
                 logger.LogWarning("Tool {Tool} failed on {File}: {Error}", tool.Name, filePath, result.Error);
         }
 
-        if (allSymbols.Count > 0)
-            await cache.StoreSymbolsAsync(filePath, allSymbols, ct);
+        await cache.StoreSymbolsAsync(filePath, allSymbols, ct);
+        await cache.StoreFileNodeAsync(new FileNode
+        {
+            FilePath = filePath,
+            RepoName = repoName,
+            Language = language.Name,
+            SymbolCount = allSymbols.Count,
+            LastIndexedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        }, ct);
+
+        logger.LogDebug("Indexed {Count} symbols in {File}", allSymbols.Count, filePath);
     }
 
     public Task RemoveFileAsync(string repoName, string filePath, CancellationToken ct = default)

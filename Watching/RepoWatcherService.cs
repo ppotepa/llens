@@ -16,9 +16,9 @@ public class RepoWatcherService(
         {
             var repo = project.Config;
 
-            if (!Directory.Exists(repo.Path))
+            if (!Directory.Exists(repo.ResolvedPath))
             {
-                logger.LogWarning("Skipping watcher for missing path: {Path}", repo.Path);
+                logger.LogWarning("Skipping watcher for missing path: {Path}", repo.ResolvedPath);
                 continue;
             }
 
@@ -27,7 +27,7 @@ public class RepoWatcherService(
 
             var extensions = project.Languages.SupportedExtensions;
 
-            var watcher = new FileSystemWatcher(repo.Path)
+            var watcher = new FileSystemWatcher(repo.ResolvedPath)
             {
                 IncludeSubdirectories = true,
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
@@ -44,7 +44,7 @@ public class RepoWatcherService(
             };
 
             _watchers.Add(watcher);
-            logger.LogInformation("Watching project: {Name} at {Path}", project.Name, repo.Path);
+            logger.LogInformation("Watching project: {Name} at {Path}", project.Name, repo.ResolvedPath);
         }
 
         await Task.Delay(Timeout.Infinite, ct);
