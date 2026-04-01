@@ -9,20 +9,18 @@ using Llens.Watching;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// All known languages — add new ones here
 builder.Services.AddSingleton<ILanguage, CSharpLanguage>();
 builder.Services.AddSingleton<ILanguage, RustLanguage>();
 builder.Services.AddSingleton<LanguageCatalogue>();
 
-// Build a per-project LanguageRegistry from config, then wrap in ProjectRegistry
 builder.Services.AddSingleton<ProjectRegistry>(sp =>
 {
     var catalogue = sp.GetRequiredService<LanguageCatalogue>();
-    var repoConfigs = builder.Configuration
+    var repos = builder.Configuration
         .GetSection("Llens:Repos")
         .Get<List<RepoConfig>>() ?? [];
 
-    var projects = repoConfigs.Select(repo =>
+    var projects = repos.Select(repo =>
         new Project(repo, catalogue.BuildRegistry(repo.Languages)));
 
     return new ProjectRegistry(projects);
@@ -34,18 +32,14 @@ builder.Services.AddHostedService<RepoWatcherService>();
 
 var app = builder.Build();
 
-app.MapGet("/health", (ProjectRegistry projects, LanguageCatalogue catalogue) => Results.Ok(new
+app.MapGet("/health", (ProjectRegistry projects) => Results.Ok(new
 {
     status = "ok",
-    knownLanguages = catalogue.KnownLanguages,
-    projects = projects.All.Select(p => new
-    {
-        p.Name,
-        p.Config.Path,
-        languages = p.Languages.All.Select(l => l.Name)
-    })
+    projects = projects.All.Select(p => new { p.Name, languages = p.Languages.All.Select(l => l.Name) })
 }));
 
-app.MapCodeMapRoutes();
+app.MapProjectRoutes();
+app.MapSymbolRoutes();
+app.MapFileRoutes();
 
 app.Run();
