@@ -1,11 +1,16 @@
 using Llens.Caching;
-using Llens.Models;
-using Llens.Tools;
 using Llens.Languages;
+using Llens.Models;
+using Llens.Scanning;
+using Llens.Tools;
 
 namespace Llens.Indexing;
 
-public class CodeIndexer(ProjectRegistry projects, ICodeMapCache cache, ILogger<CodeIndexer> logger) : ICodeIndexer
+public class CodeIndexer(
+    ProjectRegistry projects,
+    ICodeMapCache cache,
+    IFileScanner scanner,
+    ILogger<CodeIndexer> logger) : ICodeIndexer
 {
     public async Task IndexRepoAsync(RepoConfig repo, CancellationToken ct = default)
     {
@@ -23,18 +28,16 @@ public class CodeIndexer(ProjectRegistry projects, ICodeMapCache cache, ILogger<
         }
 
         var extensions = project.Languages.SupportedExtensions;
-        var files = Directory
-            .EnumerateFiles(repo.ResolvedPath, "*", SearchOption.AllDirectories)
-            .Where(f => extensions.Contains(Path.GetExtension(f)))
-            .Where(f => !repo.ExcludePaths.Any(ex => f.Contains(Path.DirectorySeparatorChar + ex + Path.DirectorySeparatorChar)));
+        var count = 0;
 
-        foreach (var file in files)
+        await foreach (var file in scanner.GetFilesAsync(repo.ResolvedPath, extensions, ct))
         {
             ct.ThrowIfCancellationRequested();
             await IndexFileAsync(repo.Name, file, ct);
+            count++;
         }
 
-        logger.LogInformation("Indexed project {Name}", repo.Name);
+        logger.LogInformation("Indexed {Count} files in project {Name}", count, repo.Name);
     }
 
     public async Task IndexFileAsync(string repoName, string filePath, CancellationToken ct = default)

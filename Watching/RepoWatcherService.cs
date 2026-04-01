@@ -1,11 +1,13 @@
 using Llens.Indexing;
 using Llens.Models;
+using Llens.Scanning;
 
 namespace Llens.Watching;
 
 public class RepoWatcherService(
     ProjectRegistry projects,
     ICodeIndexer indexer,
+    IFileScanner scanner,
     ILogger<RepoWatcherService> logger) : BackgroundService
 {
     private readonly List<FileSystemWatcher> _watchers = [];
@@ -52,11 +54,15 @@ public class RepoWatcherService(
 
     private void OnFileChanged(RepoConfig repo, string filePath, HashSet<string> extensions, CancellationToken ct)
     {
-        if (!extensions.Contains(Path.GetExtension(filePath))) return;
-
         Task.Run(async () =>
         {
-            try { await indexer.IndexFileAsync(repo.Name, filePath, ct); }
+            try
+            {
+                if (!await scanner.ShouldIndexAsync(repo.ResolvedPath, filePath, extensions, ct))
+                    return;
+
+                await indexer.IndexFileAsync(repo.Name, filePath, ct);
+            }
             catch (Exception ex) { logger.LogError(ex, "Failed to re-index {File}", filePath); }
         }, ct);
     }

@@ -5,6 +5,7 @@ using Llens.Languages;
 using Llens.Languages.CSharp;
 using Llens.Languages.Rust;
 using Llens.Models;
+using Llens.Scanning;
 using Llens.Watching;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +27,7 @@ builder.Services.AddSingleton<ProjectRegistry>(sp =>
     return new ProjectRegistry(projects);
 });
 
+builder.Services.AddSingleton<IFileScanner, GitAwareFileScanner>();
 builder.Services.AddSingleton<ICodeMapCache, InMemoryCodeMapCache>(); // swap to SqliteCodeMapCache when persistence is needed
 builder.Services.AddSingleton<ICodeIndexer, CodeIndexer>();
 builder.Services.AddHostedService<RepoWatcherService>();
