@@ -346,6 +346,88 @@ public static class CompactOpsEndpoints
             return Results.Ok(new CompactFsDiffResponse(project.Name, true, request.Path, request.Staged, lines, body));
         });
 
+        g.MapPost("/git/history", async (
+            CompactGitHistoryRequest request,
+            ProjectRegistry projects,
+            CancellationToken ct) =>
+        {
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+            var proj = project!;
+            var scopeOpt = ResolveGitScope(proj, request.Path);
+            if (scopeOpt is null) return Results.Ok(new CompactGitHistoryResponse(proj.Name, false, request.Mode, []));
+            var scope = scopeOpt.Value;
+
+            var maxCommits = Math.Clamp(request.MaxCommits <= 0 ? 20 : request.MaxCommits, 1, 200);
+            var mode = NormalizeGitMode(request.Mode);
+            var args = new List<string> { "-C", scope.GitRoot, "log", "--date=iso", $"--pretty=format:%H%x1f%ad%x1f%an%x1f%s", "-n", maxCommits.ToString() };
+            if (!string.IsNullOrWhiteSpace(request.Since)) args.Add($"--since={request.Since}");
+            if (!string.IsNullOrWhiteSpace(request.Until)) args.Add($"--until={request.Until}");
+            args.Add("--");
+            args.Add(scope.PathSpec);
+
+            var log = await RunProcessAsync("git", string.Join(" ", args.Select(QuoteArg)), scope.GitRoot, 30000, ct);
+            var commits = new List<CompactGitCommit>();
+            foreach (var line in (log.Stdout ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var p = line.Split('\x1f');
+                if (p.Length < 4) continue;
+                var commit = await BuildCommitSummaryAsync(scope.GitRoot, p[0], p[1], p[2], p[3], mode, request.Path, ct);
+                commits.Add(commit);
+                if (commits.Count >= maxCommits) break;
+            }
+
+            return Results.Ok(new CompactGitHistoryResponse(proj.Name, true, mode, commits));
+        });
+
+        g.MapPost("/git/commit", async (
+            CompactGitCommitRequest request,
+            ProjectRegistry projects,
+            CancellationToken ct) =>
+        {
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+            var proj = project!;
+            if (string.IsNullOrWhiteSpace(request.CommitId))
+                return Results.BadRequest("'commitId' is required.");
+            var scopeOpt = ResolveGitScope(proj, request.Path);
+            if (scopeOpt is null) return Results.Ok(new CompactGitCommitResponse(proj.Name, false, null));
+            var scope = scopeOpt.Value;
+
+            var meta = await RunProcessAsync("git",
+                string.Join(" ", new[] { "-C", scope.GitRoot, "show", "-s", "--date=iso", "--pretty=format:%H%x1f%ad%x1f%an%x1f%s", request.CommitId }.Select(QuoteArg)),
+                scope.GitRoot, 15000, ct);
+            var parts = (meta.Stdout ?? "").Split('\x1f');
+            if (parts.Length < 4) return Results.NotFound("Commit not found.");
+
+            var mode = NormalizeGitMode(request.Mode);
+            var commit = await BuildCommitSummaryAsync(scope.GitRoot, parts[0], parts[1], parts[2], parts[3], mode, request.Path, ct);
+            return Results.Ok(new CompactGitCommitResponse(proj.Name, true, commit));
+        });
+
+        g.MapPost("/git/patch", async (
+            CompactGitPatchRequest request,
+            ProjectRegistry projects,
+            CancellationToken ct) =>
+        {
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+            var proj = project!;
+            if (string.IsNullOrWhiteSpace(request.CommitId))
+                return Results.BadRequest("'commitId' is required.");
+            var scopeOpt = ResolveGitScope(proj, request.Path);
+            if (scopeOpt is null) return Results.Ok(new CompactGitPatchResponse(proj.Name, false, request.CommitId, request.Path, ""));
+            var scope = scopeOpt.Value;
+
+            var args = new List<string> { "-C", scope.GitRoot, "show", request.CommitId, "--" };
+            args.Add(scope.PathSpec);
+            var res = await RunProcessAsync("git", string.Join(" ", args.Select(QuoteArg)), scope.GitRoot, 30000, ct);
+            var text = (res.Stdout ?? "") + (string.IsNullOrWhiteSpace(res.Stderr) ? "" : ("\n" + res.Stderr));
+            var max = Math.Clamp(request.MaxChars <= 0 ? 30000 : request.MaxChars, 1000, 250000);
+            if (text.Length > max) text = text[..max];
+            return Results.Ok(new CompactGitPatchResponse(proj.Name, true, request.CommitId, request.Path, text));
+        });
+
         g.MapPost("/deps", async (
             CompactDepsRequest request,
             ProjectRegistry projects,
@@ -586,6 +668,9 @@ public static class CompactOpsEndpoints
                 "/api/compact/fs/write-file",
                 "/api/compact/fs/write-patch",
                 "/api/compact/fs/diff",
+                "/api/compact/git/history",
+                "/api/compact/git/commit",
+                "/api/compact/git/patch",
                 "/api/compact/deps",
                 "/api/compact/diagnostics",
                 "/api/compact/test/map",
@@ -846,6 +931,129 @@ public static class CompactOpsEndpoints
         if (string.IsNullOrWhiteSpace(value)) return "\"\"";
         if (value.IndexOfAny([' ', '\t', '\n', '\r', '"']) < 0) return value;
         return "\"" + value.Replace("\"", "\\\"") + "\"";
+    }
+
+    private static string NormalizeGitMode(string? mode)
+        => (mode ?? "meta").Trim().ToLowerInvariant() switch
+        {
+            "compact" => "compact",
+            "patch" => "patch",
+            _ => "meta"
+        };
+
+    private static (string GitRoot, string PathSpec)? ResolveGitScope(Project project, string? requestedPath)
+    {
+        var root = project.Config.ResolvedPath;
+        var gitRoot = FindGitRoot(root);
+        if (gitRoot is null) return null;
+
+        if (string.IsNullOrWhiteSpace(requestedPath))
+        {
+            var relRoot = Path.GetRelativePath(gitRoot, root);
+            return (gitRoot, relRoot);
+        }
+
+        var full = EnsureWithinProject(root, requestedPath);
+        if (full is null) return null;
+        var rel = Path.GetRelativePath(gitRoot, full);
+        return (gitRoot, rel);
+    }
+
+    private static async Task<CompactGitCommit> BuildCommitSummaryAsync(
+        string gitRoot,
+        string id,
+        string date,
+        string author,
+        string message,
+        string mode,
+        string? requestPath,
+        CancellationToken ct)
+    {
+        var files = new List<CompactGitFileChange>();
+        var stats = await RunProcessAsync(
+            "git",
+            string.Join(" ", new[] { "-C", gitRoot, "show", "--name-status", "--numstat", "--format=", id }.Select(QuoteArg)),
+            gitRoot, 20000, ct);
+
+        var inserted = 0;
+        var deleted = 0;
+        foreach (var line in (stats.Stdout ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (line.Contains('\t'))
+            {
+                var p = line.Split('\t');
+                if (p.Length >= 3 && int.TryParse(p[0], out var a) && int.TryParse(p[1], out var d))
+                {
+                    inserted += a; deleted += d;
+                    continue;
+                }
+
+                if (p.Length >= 2 && p[0].Length <= 2)
+                {
+                    var status = p[0];
+                    var path = p[^1];
+                    files.Add(new CompactGitFileChange(path, status, null, null, null, []));
+                }
+            }
+        }
+
+        if (mode == "compact")
+        {
+            var args = new List<string> { "-C", gitRoot, "show", "-U0", "--format=", id };
+            if (!string.IsNullOrWhiteSpace(requestPath)) { args.Add("--"); args.Add(requestPath!); }
+            var diff = await RunProcessAsync("git", string.Join(" ", args.Select(QuoteArg)), gitRoot, 20000, ct);
+            var hunksByFile = ParseCompactHunks(diff.Stdout ?? "");
+            for (var i = 0; i < files.Count; i++)
+            {
+                if (hunksByFile.TryGetValue(files[i].Path, out var hunks))
+                    files[i] = files[i] with { Hunks = hunks.Take(20).ToList() };
+            }
+        }
+
+        return new CompactGitCommit(id, date, author, message, inserted, deleted, files);
+    }
+
+    private static Dictionary<string, List<CompactGitHunk>> ParseCompactHunks(string patch)
+    {
+        var map = new Dictionary<string, List<CompactGitHunk>>(StringComparer.OrdinalIgnoreCase);
+        string? currentFile = null;
+        foreach (var line in patch.Split('\n'))
+        {
+            if (line.StartsWith("+++ b/", StringComparison.Ordinal))
+            {
+                currentFile = line["+++ b/".Length..].Trim();
+                if (!map.ContainsKey(currentFile)) map[currentFile] = [];
+                continue;
+            }
+
+            if (currentFile is null) continue;
+            if (!line.StartsWith("@@", StringComparison.Ordinal)) continue;
+
+            var h = ParseHunkHeader(line);
+            if (h is not null) map[currentFile].Add(h);
+        }
+        return map;
+    }
+
+    private static CompactGitHunk? ParseHunkHeader(string header)
+    {
+        // @@ -a,b +c,d @@ optional
+        var parts = header.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 3) return null;
+        var oldPart = parts[1].TrimStart('-');
+        var newPart = parts[2].TrimStart('+');
+
+        static (int Start, int Count) ParseRange(string s)
+        {
+            var p = s.Split(',');
+            var start = int.TryParse(p[0], out var a) ? a : 0;
+            var count = p.Length > 1 && int.TryParse(p[1], out var b) ? b : 1;
+            return (start, count);
+        }
+
+        var oldR = ParseRange(oldPart);
+        var newR = ParseRange(newPart);
+        return new CompactGitHunk(oldR.Start, oldR.Count, newR.Start, newR.Count);
     }
 
     private static string? FindGitRoot(string startPath)
@@ -1119,6 +1327,33 @@ public class CompactFsDiffRequest
     public int TimeoutMs { get; init; } = 15000;
 }
 public record CompactFsDiffResponse(string Project, bool IsGitRepo, string? Path, bool Staged, int Lines, string Diff);
+
+public record CompactGitHistoryRequest(string Project, string? Path = null, string? Since = null, string? Until = null, int MaxCommits = 20, string Mode = "meta");
+public record CompactGitCommitRequest(string Project, string CommitId, string? Path = null, string Mode = "compact");
+public record CompactGitPatchRequest(string Project, string CommitId, string? Path = null, int MaxChars = 30000);
+
+public record CompactGitHistoryResponse(string Project, bool IsGitRepo, string Mode, List<CompactGitCommit> Commits);
+public record CompactGitCommitResponse(string Project, bool IsGitRepo, CompactGitCommit? Commit);
+public record CompactGitPatchResponse(string Project, bool IsGitRepo, string CommitId, string? Path, string Patch);
+
+public record CompactGitCommit(
+    string Id,
+    string Date,
+    string Author,
+    string Message,
+    int Inserted,
+    int Deleted,
+    List<CompactGitFileChange> Files);
+
+public record CompactGitFileChange(
+    string Path,
+    string Status,
+    int? Inserted,
+    int? Deleted,
+    string? PrevPath,
+    List<CompactGitHunk> Hunks);
+
+public record CompactGitHunk(int OldStart, int OldCount, int NewStart, int NewCount);
 
 public class CompactDepsRequest
 {

@@ -350,6 +350,9 @@ Token-efficient, minimal-shape endpoints for development loops:
 - `POST /api/compact/fs/write-file`
 - `POST /api/compact/fs/write-patch`
 - `POST /api/compact/fs/diff`
+- `POST /api/compact/git/history`
+- `POST /api/compact/git/commit`
+- `POST /api/compact/git/patch`
 - `POST /api/compact/deps`
 - `POST /api/compact/diagnostics`
 - `POST /api/compact/test/map`
@@ -434,6 +437,17 @@ Applies or dry-runs patch operations (`literal` or `regex`) on files in project 
 
 ### `POST /api/compact/fs/diff`
 Returns git diff text for project root or a specific path.
+
+### `POST /api/compact/git/history`
+Efficient commit history:
+- `mode=meta`: commit metadata + changed files (cheapest)
+- `mode=compact`: adds hunk headers without full patch bodies
+
+### `POST /api/compact/git/commit`
+Single-commit detail in `meta|compact` mode.
+
+### `POST /api/compact/git/patch`
+Full patch text on demand (`maxChars` bounded).
 
 ### `POST /api/compact/deps`
 Dependency edges for seed:
