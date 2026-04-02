@@ -2,6 +2,9 @@
 
 Base URL: `http://localhost:<PORT>` (default from `launch.sh` is `5100`)
 
+See also:
+- [`COMPACT_API_GUIDE.md`](COMPACT_API_GUIDE.md) for the recommended low-token workflow with examples.
+
 ## Health
 
 ### `GET /health`
