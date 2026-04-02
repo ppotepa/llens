@@ -28,6 +28,7 @@
     <Compile Include="Indexing/**/*.cs" />
     <Compile Include="Observability/**/*.cs" />
     <Compile Include="Scanning/**/*.cs" />
+    <Compile Include="Shared/**/*.cs" />
     <Compile Include="Watching/**/*.cs" />
   </ItemGroup>
 

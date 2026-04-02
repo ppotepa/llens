@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Llens.Models;
+using Llens.Shared;
 
 namespace Llens.Api;
 
@@ -105,7 +106,7 @@ internal static class CompactOpsCommandBridge
 
     public static (string File, string Args, string Kind)? ResolveFormatCommand(string root, string target, bool checkOnly, string? path)
     {
-        var fullPath = string.IsNullOrWhiteSpace(path) ? null : EnsureWithinProject(root, path!);
+        var fullPath = string.IsNullOrWhiteSpace(path) ? null : ProjectPathHelper.EnsureWithinProject(root, path!);
         var relativePath = fullPath is null ? null : Path.GetRelativePath(root, fullPath);
 
         static string BuildDotnetFormatArgs(bool verifyNoChanges, string? includePath)
@@ -149,7 +150,7 @@ internal static class CompactOpsCommandBridge
 
     public static (string File, string Args, string Kind)? ResolveLintCommand(string root, string target, string? path)
     {
-        var fullPath = string.IsNullOrWhiteSpace(path) ? null : EnsureWithinProject(root, path!);
+        var fullPath = string.IsNullOrWhiteSpace(path) ? null : ProjectPathHelper.EnsureWithinProject(root, path!);
         var relativePath = fullPath is null ? null : Path.GetRelativePath(root, fullPath);
 
         static string BuildDotnetLintArgs()
@@ -250,20 +251,6 @@ internal static class CompactOpsCommandBridge
         if (string.IsNullOrWhiteSpace(value)) return "\"\"";
         if (value.IndexOfAny([' ', '\t', '\n', '\r', '"']) < 0) return value;
         return "\"" + value.Replace("\"", "\\\"") + "\"";
-    }
-
-    private static string? EnsureWithinProject(string projectRoot, string relativeOrAbsolutePath)
-    {
-        var combined = Path.IsPathRooted(relativeOrAbsolutePath)
-            ? Path.GetFullPath(relativeOrAbsolutePath)
-            : Path.GetFullPath(Path.Combine(projectRoot, relativeOrAbsolutePath));
-        var root = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        if (combined.Equals(root, StringComparison.OrdinalIgnoreCase))
-            return combined;
-        if (!combined.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            && !combined.StartsWith(root + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            return null;
-        return combined;
     }
 
     private static List<CompactDiagnostic> ParseDiagnostics(string text, int max)

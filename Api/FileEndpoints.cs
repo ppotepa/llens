@@ -1,4 +1,5 @@
 using Llens.Caching;
+using Llens.Models;
 
 namespace Llens.Api;
 
@@ -16,24 +17,36 @@ public static class FileEndpoints
         });
 
         // File metadata + its imports — replaces: reading the file and parsing imports manually
-        g.MapGet("/node", async (string path, ICodeMapCache cache) =>
+        g.MapGet("/node", async (string path, string? project, ProjectRegistry projects, ICodeMapCache cache, CancellationToken ct) =>
         {
-            var node = await cache.GetFileNodeAsync(path);
+            var (resolvedPath, error) = await IndexedPathResolver.ResolveAsync(path, project, projects, cache, ct);
+            if (error is not null) return Results.BadRequest(error);
+
+            var node = await cache.GetFileNodeAsync(resolvedPath!, ct);
             return node is null ? Results.NotFound() : Results.Ok(node);
         });
 
         // What imports this file — replaces: grep -rn "use crate::models::product" . or similar
-        g.MapGet("/dependents", async (string path, string? project, ICodeMapCache cache) =>
+        g.MapGet("/dependents", async (string path, string? project, ProjectRegistry projects, ICodeMapCache cache, CancellationToken ct) =>
         {
-            var dependents = await cache.GetDependentsAsync(path, project);
+            var (resolvedPath, error) = await IndexedPathResolver.ResolveAsync(path, project, projects, cache, ct);
+            if (error is not null) return Results.BadRequest(error);
+
+            var dependents = await cache.GetDependentsAsync(resolvedPath!, project, ct);
             return Results.Ok(dependents);
         });
 
         // Source context window — replaces: reading an entire file to find 10 relevant lines
-        g.MapGet("/context", async (string path, int line, int radius, ICodeMapCache cache) =>
+        g.MapGet("/context", async (string path, int line, int radius, string? project, ProjectRegistry projects, ICodeMapCache cache, CancellationToken ct) =>
         {
-            var context = await cache.GetSourceContextAsync(path, line, radius == 0 ? 20 : radius);
-            return context is null ? Results.NotFound() : Results.Ok(new { path, line, radius, context });
+            var (resolvedPath, error) = await IndexedPathResolver.ResolveAsync(path, project, projects, cache, ct);
+            if (error is not null) return Results.BadRequest(error);
+
+            var actualRadius = radius == 0 ? 20 : radius;
+            var context = await cache.GetSourceContextAsync(resolvedPath!, line, actualRadius, ct);
+            return context is null
+                ? Results.NotFound()
+                : Results.Ok(new { path = resolvedPath, line, radius = actualRadius, context });
         });
     }
 }

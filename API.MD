@@ -37,20 +37,96 @@ Returns implementor candidates. Currently heuristic/partial.
 
 ### `GET /api/symbols/in-file?path=<absolute-path>`
 All symbols for a file.
+`path` can be absolute or project-relative. When using relative paths in
+multi-project setups, pass `project=<name>` to avoid ambiguity.
 
 ## Files
 
 ### `GET /api/files/?project=<name>`
 All indexed files for a project.
 
-### `GET /api/files/node?path=<absolute-path>`
+### `GET /api/files/node?path=<absolute-or-relative-path>&project=<optional>`
 File metadata and imports.
+`path` can be absolute or project-relative.
 
-### `GET /api/files/dependents?path=<absolute-path>&project=<optional>`
+### `GET /api/files/dependents?path=<absolute-or-relative-path>&project=<optional>`
 Files that import/reference this file (via file graph).
+`path` can be absolute or project-relative.
 
-### `GET /api/files/context?path=<absolute-path>&line=<n>&radius=<n>`
+### `GET /api/files/context?path=<absolute-or-relative-path>&line=<n>&radius=<n>&project=<optional>`
 Source window around a line.
+`path` can be absolute or project-relative.
+
+## Compact FS
+
+### `POST /api/compact/fs/tree`
+Project tree snapshot. Supports optional subpath scoping:
+
+```json
+{
+  "project": "shell-quest-tests",
+  "path": "mods/asteroids",
+  "maxDepth": 4,
+  "maxEntries": 200
+}
+```
+
+### `POST /api/compact/fs/read-range`
+Read a line range from a single file.
+
+### `POST /api/compact/fs/read-many`
+Batch-read many files in one request.
+
+Request:
+
+```json
+{
+  "project": "shell-quest-tests",
+  "paths": ["mods/asteroids/mod.yaml", "mods/asteroids/scenes/game/scene.yml"],
+  "from": 1,
+  "to": 4000,
+  "maxFiles": 200,
+  "format": "tuple"
+}
+```
+
+Supported `format` values:
+- omitted/default: object response with `files[]`
+- `tuple`: compact tuple envelope
+- `raw-lossless`: binary payload (lossless framing with per-file byte length + sha256 + exact file bytes)
+- `raw-ordered`: ultra-lean lossless framing in request order (`B <len>` + exact bytes, no path/hash metadata)
+
+Notes:
+- `raw-lossless` is self-describing and independently verifiable per file.
+- `raw-ordered` is the smallest lossless format for full reads; file identity is preserved by request order (`paths[i]` -> block `i`).
+
+### `POST /api/compact/fs/read-spans`
+Read selected line ranges from multiple files (metadata-first follow-up fetch).
+
+Request:
+
+```json
+{
+  "project": "shell-quest-tests",
+  "spans": [
+    { "path": "mods/asteroids/scenes/game/game-loop.rhai", "from": 220, "to": 320 },
+    { "path": "mods/asteroids/catalogs/input-profiles.yaml", "from": 1, "to": 40 }
+  ],
+  "maxSpans": 120,
+  "maxLinesPerSpan": 220,
+  "format": "tuple"
+}
+```
+
+## Recommended Low-Token Flow
+
+Use this sequence for LLM tasks:
+
+1. `POST /api/compact/resolve` (or `/api/compact/query`) to get candidates.
+2. `POST /api/compact/fs/read-spans` for only the required ranges.
+3. Use `POST /api/compact/fs/read-many` with:
+   - `format: "raw-ordered"` for full-file bulk reads with minimum overhead.
+   - `format: "raw-lossless"` when you need per-file integrity/hash metadata.
 
 ## Unified Query API (MVP)
 
@@ -344,6 +420,7 @@ Token-efficient, minimal-shape endpoints for development loops:
 - `POST /api/compact/graph`
 - `POST /api/compact/references-tree`
 - `POST /api/compact/regex`
+- `POST /api/compact/rg`
 - `POST /api/compact/replace-plan`
 - `POST /api/compact/fs/tree`
 - `POST /api/compact/fs/read-range`
@@ -430,6 +507,7 @@ Tuple mode (token-optimized) is available on:
 - `POST /api/compact/query` with `"format":"tuple"`
 - `POST /api/compact/context-pack` with `"format":"tuple"`
 - `POST /api/compact/git/status` with `"format":"tuple"`
+- `POST /api/compact/rg` with `"format":"tuple"`
 
 Resolver endpoint:
 - `/api/compact/resolve` runs deterministic fallback chain:
@@ -453,6 +531,24 @@ Regex scan over indexed project files (bounded by `maxFiles` / `maxMatches`).
   "ignoreCase": true,
   "maxFiles": 300,
   "maxMatches": 250
+}
+```
+
+### `POST /api/compact/rg`
+Searches indexed files in `regex` or `literal` mode with compact, line-oriented hits.
+`pathPrefix` accepts full path or project-relative prefix.
+
+```json
+{
+  "project": "llens",
+  "pattern": "MapPost\\(\"/rg\"",
+  "mode": "regex",
+  "pathPrefix": "Api",
+  "ignoreCase": true,
+  "maxFiles": 300,
+  "maxMatches": 300,
+  "maxLineLength": 220,
+  "format": "tuple"
 }
 ```
 
@@ -739,7 +835,22 @@ curl -sS -X POST http://localhost:5100/api/compact/js/check \
   }' | jq
 ```
 
-### 10) Reindex a project, file, or directory
+### 10) Search project text with compact `rg` (tuple mode)
+
+```bash
+curl -sS -X POST http://localhost:5100/api/compact/rg \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project":"llens",
+    "pattern":"CompactFsService",
+    "mode":"literal",
+    "pathPrefix":"Api",
+    "maxMatches":80,
+    "format":"tuple"
+  }' | jq
+```
+
+### 11) Reindex a project, file, or directory
 
 Project-wide refresh with stale-cache pruning:
 

@@ -1,10 +1,8 @@
 using Llens.Api;
 using Llens.Application.Fs;
 using Llens.Application.JsCheck;
-using Llens.Caching;
-using Llens.Indexing;
+using Llens.Application.Reindex;
 using Llens.Models;
-using Llens.Scanning;
 using System.Text.Json;
 
 namespace Llens.Cli;
@@ -14,24 +12,18 @@ public sealed class CompactCliCommands
     private readonly ProjectRegistry _projects;
     private readonly IJsCheckService _jsCheckService;
     private readonly ICompactFsService _fsService;
-    private readonly ICodeMapCache _cache;
-    private readonly ICodeIndexer _indexer;
-    private readonly IFileScanner _scanner;
+    private readonly ICompactReindexService _reindexService;
 
     public CompactCliCommands(
         ProjectRegistry projects,
         IJsCheckService jsCheckService,
         ICompactFsService fsService,
-        ICodeMapCache cache,
-        ICodeIndexer indexer,
-        IFileScanner scanner)
+        ICompactReindexService reindexService)
     {
         _projects = projects;
         _jsCheckService = jsCheckService;
         _fsService = fsService;
-        _cache = cache;
-        _indexer = indexer;
-        _scanner = scanner;
+        _reindexService = reindexService;
     }
 
     [ToolCommand("js.check", Description = "Syntax-check JavaScript files")]
@@ -60,7 +52,7 @@ public sealed class CompactCliCommands
     public CompactFsTreeResponse FsTree(FsTreeCliRequest request)
     {
         var project = ResolveProject(request.Project);
-        var apiRequest = new CompactFsTreeRequest(request.Project, request.MaxDepth ?? 3, request.MaxEntries ?? 600);
+        var apiRequest = new CompactFsTreeRequest(request.Project, request.Path, request.MaxDepth ?? 3, request.MaxEntries ?? 600);
         var outcome = _fsService.Tree(project, apiRequest);
         if (!outcome.Ok || outcome.Response is null)
             throw new CliBindingException(outcome.ErrorMessage ?? "fs.tree failed.");
@@ -235,79 +227,25 @@ public sealed class CompactCliCommands
     public async Task<CompactReindexResponse> Reindex(ReindexCliRequest request, CancellationToken ct)
     {
         var project = ResolveProject(request.Project);
-        var root = project.Config.ResolvedPath;
-        var extensions = project.Languages.SupportedExtensions;
-        var maxFiles = Math.Clamp(request.MaxFiles ?? 5000, 1, 50000);
-
-        var mode = "project";
-        var indexed = 0;
-        var removed = 0;
-        var skipped = 0;
-        var failed = 0;
-        var targetPath = request.Path;
-
-        if (string.IsNullOrWhiteSpace(request.Path))
+        var apiRequest = new CompactReindexRequest
         {
-            if (request.PruneStale ?? true)
-                removed += await PruneMissingIndexedFilesAsync(project, null, ct);
-
-            await _indexer.IndexRepoAsync(project.Config, ct);
-            indexed = (await _cache.GetAllFilesAsync(project.Name, ct)).Count();
-        }
-        else
+            Project = request.Project,
+            Path = request.Path,
+            PruneStale = request.PruneStale ?? true,
+            MaxFiles = request.MaxFiles ?? 5000
+        };
+        try
         {
-            var scope = EnsureWithinProject(root, request.Path!);
-            if (scope is null)
-                throw new CliBindingException("Path is outside project root.");
-
-            if (File.Exists(scope))
-            {
-                mode = "file";
-                if (!await _scanner.ShouldIndexAsync(root, scope, extensions, ct))
-                {
-                    skipped = 1;
-                }
-                else
-                {
-                    await _indexer.IndexFileAsync(project.Name, scope, ct);
-                    indexed = 1;
-                }
-                targetPath = Path.GetRelativePath(root, scope);
-            }
-            else if (Directory.Exists(scope))
-            {
-                mode = "directory";
-                if (request.PruneStale ?? true)
-                    removed += await PruneMissingIndexedFilesAsync(project, scope, ct);
-
-                await foreach (var file in _scanner.GetFilesAsync(scope, extensions, ct))
-                {
-                    if (indexed >= maxFiles) break;
-                    if (!await _scanner.ShouldIndexAsync(root, file, extensions, ct))
-                    {
-                        skipped++;
-                        continue;
-                    }
-
-                    try
-                    {
-                        await _indexer.IndexFileAsync(project.Name, file, ct);
-                        indexed++;
-                    }
-                    catch
-                    {
-                        failed++;
-                    }
-                }
-                targetPath = Path.GetRelativePath(root, scope);
-            }
-            else
-            {
-                throw new CliBindingException("Path not found.");
-            }
+            return await _reindexService.RunAsync(project, apiRequest, ct);
         }
-
-        return new CompactReindexResponse(project.Name, mode, targetPath, indexed, removed, skipped, failed, request.PruneStale ?? true, 0);
+        catch (FileNotFoundException)
+        {
+            throw new CliBindingException("Path not found.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new CliBindingException(ex.Message);
+        }
     }
 
     private Project ResolveProject(string projectName)
@@ -318,45 +256,6 @@ public sealed class CompactCliCommands
         return project;
     }
 
-    private async Task<int> PruneMissingIndexedFilesAsync(Project project, string? scopePath, CancellationToken ct)
-    {
-        var removed = 0;
-        var indexedFiles = await _cache.GetAllFilesAsync(project.Name, ct);
-        foreach (var file in indexedFiles)
-        {
-            if (scopePath is not null && !IsPathWithin(file.FilePath, scopePath))
-                continue;
-            if (File.Exists(file.FilePath))
-                continue;
-
-            await _indexer.RemoveFileAsync(project.Name, file.FilePath, ct);
-            removed++;
-        }
-        return removed;
-    }
-
-    private static string? EnsureWithinProject(string projectRoot, string relativeOrAbsolutePath)
-    {
-        var combined = Path.IsPathRooted(relativeOrAbsolutePath)
-            ? Path.GetFullPath(relativeOrAbsolutePath)
-            : Path.GetFullPath(Path.Combine(projectRoot, relativeOrAbsolutePath));
-        var root = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        if (combined.Equals(root, StringComparison.OrdinalIgnoreCase))
-            return combined;
-        if (!combined.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            && !combined.StartsWith(root + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            return null;
-        return combined;
-    }
-
-    private static bool IsPathWithin(string filePath, string scopePath)
-    {
-        var fullFile = Path.GetFullPath(filePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var fullScope = Path.GetFullPath(scopePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return fullFile.Equals(fullScope, StringComparison.OrdinalIgnoreCase)
-               || fullFile.StartsWith(fullScope + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-               || fullFile.StartsWith(fullScope + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-    }
 }
 
 public sealed class JsCheckCliRequest
@@ -378,6 +277,9 @@ public sealed class FsTreeCliRequest
 {
     [ToolArg("project", Description = "Registered project name")]
     public string Project { get; set; } = "";
+
+    [ToolArg("path", Description = "Optional directory path within project")]
+    public string? Path { get; set; }
 
     [ToolArg("max-depth", Description = "Optional max traversal depth")]
     public int? MaxDepth { get; set; }

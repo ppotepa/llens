@@ -45,9 +45,12 @@ public static class SymbolEndpoints
         });
 
         // All symbols in a file
-        g.MapGet("/in-file", async (string path, ICodeMapCache cache) =>
+        g.MapGet("/in-file", async (string path, string? project, ProjectRegistry projects, ICodeMapCache cache, CancellationToken ct) =>
         {
-            var symbols = await cache.QueryByFileAsync(path);
+            var (resolvedPath, error) = await IndexedPathResolver.ResolveAsync(path, project, projects, cache, ct);
+            if (error is not null) return Results.BadRequest(error);
+
+            var symbols = await cache.QueryByFileAsync(resolvedPath!, ct);
             return Results.Ok(symbols);
         });
     }

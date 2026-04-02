@@ -29,9 +29,9 @@ public static class CompactEndpoints
             var q = request.Q.Trim();
             var items = mode switch
             {
-                "snippet" => await RunSnippetAsync(cache, request.Project, q, limit, ct),
-                "references" => await RunReferencesAsync(cache, request.Project, q, limit, ct),
-                _ => await RunFuzzyAsync(cache, request.Project, q, limit, ct)
+                "snippet" => await CompactSearchEngine.RunSnippetAsync(cache, request.Project, q, limit, ct),
+                "references" => await CompactSearchEngine.RunReferencesAsync(cache, request.Project, q, limit, ct),
+                _ => await CompactSearchEngine.RunFuzzyAsync(cache, request.Project, q, limit, ct)
             };
 
             var response = new CompactQueryResponse
@@ -41,7 +41,7 @@ public static class CompactEndpoints
                 Q = q,
                 Items = items,
                 Count = items.Count,
-                Tokens = EstimateCompactTokens(items)
+                Tokens = CompactSearchEngine.EstimateCompactTokens(items)
             };
 
             telemetry.Record(
@@ -74,18 +74,7 @@ public static class CompactEndpoints
 
             var q = request.Q.Trim();
             var limit = Math.Clamp(request.Limit <= 0 ? 12 : request.Limit, 1, 40);
-            var stage = "exact";
-            var items = await RunExactAsync(cache, request.Project, q, limit, ct);
-            if (items.Count == 0)
-            {
-                stage = "fuzzy";
-                items = await RunFuzzyAsync(cache, request.Project, q, limit, ct);
-            }
-            if (items.Count == 0)
-            {
-                stage = "snippet";
-                items = await RunSnippetAsync(cache, request.Project, q, limit, ct);
-            }
+            var (stage, items) = await CompactSearchEngine.ResolveBestEffortAsync(cache, request.Project, q, limit, ct);
 
             var response = new CompactResolveResponse
             {
@@ -93,7 +82,7 @@ public static class CompactEndpoints
                 Q = q,
                 Stage = stage,
                 Count = items.Count,
-                Tokens = EstimateCompactTokens(items),
+                Tokens = CompactSearchEngine.EstimateCompactTokens(items),
                 Items = items
             };
 
@@ -129,24 +118,20 @@ public static class CompactEndpoints
             var mode = NormalizeMode(request.Mode);
             var previousIds = request.PreviousIds?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
 
-            var items = await RunFuzzyAsync(cache, request.Project, q, maxItems, ct);
-            if (mode is "references" or "impact")
-            {
-                var extra = await RunReferencesAsync(cache, request.Project, q, maxItems, ct);
-                foreach (var x in extra)
-                {
-                    if (items.Any(i => i.Id == x.Id && i.P == x.P && i.L == x.L)) continue;
-                    items.Add(x);
-                    if (items.Count >= maxItems) break;
-                }
-            }
+            var items = await CompactSearchEngine.ExpandWithReferencesForImpactAsync(
+                cache,
+                request.Project,
+                q,
+                maxItems,
+                mode,
+                ct);
 
             var packed = new List<CompactItem>(capacity: Math.Min(maxItems, items.Count));
             var used = 0;
             foreach (var item in items)
             {
                 if (previousIds.Contains(item.Id)) continue;
-                var est = EstimateCompactTokens([item]);
+                var est = CompactSearchEngine.EstimateCompactTokens([item]);
                 if (used + est > tokenBudget) break;
                 used += est;
                 packed.Add(item);
@@ -321,107 +306,12 @@ public static class CompactEndpoints
         });
     }
 
-    private static async Task<List<CompactItem>> RunFuzzyAsync(ICodeMapCache cache, string project, string q, int limit, CancellationToken ct)
-    {
-        var tokens = Tokenize(q);
-        if (tokens.Count == 0) tokens = [q];
-
-        var scored = new Dictionary<string, (CodeSymbol S, int Score)>(StringComparer.OrdinalIgnoreCase);
-        foreach (var t in tokens.Take(12))
-        {
-            var hits = await cache.QueryByNameAsync(t, project, ct);
-            foreach (var s in hits.Take(200))
-            {
-                var score = ScoreSymbol(s, q, tokens);
-                if (score <= 0) continue;
-                if (!scored.TryGetValue(s.Id, out var prev) || score > prev.Score)
-                    scored[s.Id] = (s, score);
-            }
-        }
-
-        return [.. scored.Values
-            .OrderByDescending(x => x.Score)
-            .ThenBy(x => x.S.Name, StringComparer.OrdinalIgnoreCase)
-            .Take(limit)
-            .Select(x => new CompactItem(
-                Id: $"symbol:{x.S.Id}",
-                T: "s",
-                N: x.S.Name,
-                P: x.S.FilePath,
-                L: x.S.LineStart,
-                K: x.S.Kind.ToString(),
-                Sc: x.Score))];
-    }
-
-    private static async Task<List<CompactItem>> RunExactAsync(ICodeMapCache cache, string project, string q, int limit, CancellationToken ct)
-    {
-        var hits = await cache.QueryByNameAsync(q, project, ct);
-        return [.. hits
-            .Where(s => s.Name.Equals(q, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(s => s.FilePath, StringComparer.OrdinalIgnoreCase)
-            .Take(limit)
-            .Select(s => new CompactItem(
-                Id: $"symbol:{s.Id}",
-                T: "s",
-                N: s.Name,
-                P: s.FilePath,
-                L: s.LineStart,
-                K: s.Kind.ToString(),
-                Sc: 200))];
-    }
-
-    private static async Task<List<CompactItem>> RunSnippetAsync(ICodeMapCache cache, string project, string q, int limit, CancellationToken ct)
-    {
-        var files = await cache.GetAllFilesAsync(project, ct);
-        var items = new List<CompactItem>(capacity: limit);
-        foreach (var f in files)
-        {
-            if (!File.Exists(f.FilePath)) continue;
-            var lines = await File.ReadAllLinesAsync(f.FilePath, ct);
-            for (var i = 0; i < lines.Length; i++)
-            {
-                if (!lines[i].Contains(q, StringComparison.OrdinalIgnoreCase)) continue;
-                items.Add(new CompactItem(
-                    Id: $"file:{f.FilePath}:{i + 1}",
-                    T: "m",
-                    N: Path.GetFileName(f.FilePath),
-                    P: f.FilePath,
-                    L: i + 1,
-                    K: f.Language,
-                    Sc: 1));
-                if (items.Count >= limit) return items;
-            }
-        }
-        return items;
-    }
-
-    private static async Task<List<CompactItem>> RunReferencesAsync(ICodeMapCache cache, string project, string q, int limit, CancellationToken ct)
-    {
-        var symbols = await cache.QueryByNameAsync(q, project, ct);
-        var selected = symbols
-            .OrderByDescending(s => ScoreSymbol(s, q, Tokenize(q)))
-            .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
-        if (selected is null) return [];
-
-        var refs = await cache.QueryReferencesAsync(selected.Id, project, ct);
-        return [.. refs.Take(limit).Select(r => new CompactItem(
-            Id: $"ref:{selected.Id}:{r.InFilePath}:{r.Line}",
-            T: "r",
-            N: selected.Name,
-            P: r.InFilePath,
-            L: r.Line,
-            K: "ref",
-            Sc: 1))];
-    }
-
     private static async Task<CompactGraphNode?> ResolveSeedAsync(ICodeMapCache cache, string project, GraphSeed seed, CancellationToken ct)
     {
         var type = (seed.Type ?? "").Trim().ToLowerInvariant();
         if (type == "file")
         {
-            var p = NormalizeFileSeed(seed.Path ?? seed.Id);
+            var p = CompactSearchEngine.NormalizeFileSeed(seed.Path ?? seed.Id);
             if (string.IsNullOrWhiteSpace(p)) return null;
             var full = Path.GetFullPath(p!);
             var file = await cache.GetFileNodeAsync(full, ct);
@@ -437,7 +327,7 @@ public static class CompactEndpoints
 
     private static async Task<CompactGraphNode?> ResolveSymbolSeedAsync(ICodeMapCache cache, string project, GraphSeed seed, CancellationToken ct)
     {
-        var symbolId = NormalizeSymbolSeed(seed.Id);
+        var symbolId = CompactSearchEngine.NormalizeSymbolSeed(seed.Id);
         if (!string.IsNullOrWhiteSpace(symbolId))
         {
             var all = await cache.QueryByNameAsync("", project, ct);
@@ -449,7 +339,7 @@ public static class CompactEndpoints
         if (string.IsNullOrWhiteSpace(q)) return null;
         var byName = await cache.QueryByNameAsync(q, project, ct);
         var best = byName
-            .OrderByDescending(s => ScoreSymbol(s, q, Tokenize(q)))
+            .OrderByDescending(s => CompactSearchEngine.ScoreSymbol(s, q, CompactSearchEngine.Tokenize(q)))
             .ThenBy(s => s.FilePath, StringComparer.OrdinalIgnoreCase)
             .ThenBy(s => s.LineStart)
             .FirstOrDefault();
@@ -548,49 +438,6 @@ public static class CompactEndpoints
 
     private static bool IsTupleFormat(string? format)
         => string.Equals(format?.Trim(), "tuple", StringComparison.OrdinalIgnoreCase);
-
-    private static string? NormalizeSymbolSeed(string? seedId)
-    {
-        if (string.IsNullOrWhiteSpace(seedId)) return null;
-        return seedId.StartsWith("symbol:", StringComparison.OrdinalIgnoreCase)
-            ? seedId["symbol:".Length..]
-            : seedId;
-    }
-
-    private static string? NormalizeFileSeed(string? seedPath)
-    {
-        if (string.IsNullOrWhiteSpace(seedPath)) return null;
-        return seedPath.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
-            ? seedPath["file:".Length..]
-            : seedPath;
-    }
-
-    private static List<string> Tokenize(string query)
-        => query
-            .Split([' ', '\t', '\r', '\n', '.', ':', '/', '\\', '-', '_', '(', ')', '[', ']', '{', '}', ','], StringSplitOptions.RemoveEmptyEntries)
-            .Select(t => t.Trim())
-            .Where(t => t.Length >= 2)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-    private static int ScoreSymbol(CodeSymbol symbol, string query, IReadOnlyList<string> tokens)
-    {
-        var score = 0;
-        if (symbol.Name.Equals(query, StringComparison.OrdinalIgnoreCase)) score += 100;
-        else if (symbol.Name.StartsWith(query, StringComparison.OrdinalIgnoreCase)) score += 70;
-        else if (symbol.Name.Contains(query, StringComparison.OrdinalIgnoreCase)) score += 50;
-        foreach (var token in tokens)
-        {
-            if (symbol.Name.Contains(token, StringComparison.OrdinalIgnoreCase)) score += 12;
-            if (!string.IsNullOrEmpty(symbol.Signature) && symbol.Signature.Contains(token, StringComparison.OrdinalIgnoreCase)) score += 6;
-            if (symbol.FilePath.Contains(token, StringComparison.OrdinalIgnoreCase)) score += 3;
-        }
-        return score;
-    }
-
-    private static int EstimateCompactTokens(IEnumerable<CompactItem> items)
-        => Math.Max(1, items.Sum(i =>
-            (i.Id?.Length ?? 0) + (i.N?.Length ?? 0) + (i.P?.Length ?? 0) + (i.K?.Length ?? 0)) / 4);
 
     private static int EstimateCompactGraphTokens(CompactGraphResponse response)
         => Math.Max(1, (response.Nodes.Sum(n => (n.Id?.Length ?? 0) + (n.L?.Length ?? 0) + (n.P?.Length ?? 0))

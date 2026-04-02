@@ -1,6 +1,7 @@
 using Llens.Api;
 using Llens.Application.Fs;
 using Llens.Application.JsCheck;
+using Llens.Application.Reindex;
 using Llens.Caching;
 using Llens.Cli;
 using Llens.Indexing;
@@ -37,6 +38,7 @@ builder.Services.AddSingleton<CompactSessionStore>();
 builder.Services.AddSingleton<CompactDevServerStore>();
 builder.Services.AddSingleton<IJsCheckService, JsCheckService>();
 builder.Services.AddSingleton<ICompactFsService, CompactFsService>();
+builder.Services.AddSingleton<ICompactReindexService, CompactReindexService>();
 builder.Services.AddSingleton<CompactCliCommands>();
 builder.Services.AddSingleton<CliCommandRegistry>();
 builder.Services.AddSingleton<CliCommandRunner>();

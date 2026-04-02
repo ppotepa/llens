@@ -1,14 +1,15 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using Llens.Caching;
 using Llens.Application.Fs;
 using Llens.Cli;
 using Llens.Application.JsCheck;
-using Llens.Indexing;
 using Llens.Models;
 using Llens.Observability;
-using Llens.Scanning;
+using Llens.Shared;
 
 namespace Llens.Api;
 
@@ -63,6 +64,80 @@ public static class CompactOpsEndpoints
 
             telemetry.Record("/api/compact/regex", "regex", project.Name, sw.ElapsedMilliseconds, matches.Count, matches.Count == 0, false, EstimateTokens(matches));
             return Results.Ok(new CompactRegexResponse(project.Name, request.Pattern, matches.Count, matches));
+        });
+
+        g.MapPost("/rg", async (
+            CompactRgRequest request,
+            ProjectRegistry projects,
+            ICodeMapCache cache,
+            QueryTelemetry telemetry,
+            CancellationToken ct) =>
+        {
+            var sw = Stopwatch.StartNew();
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+            if (string.IsNullOrWhiteSpace(request.Pattern))
+                return Results.BadRequest("'pattern' is required.");
+
+            var proj = project!;
+            var mode = (request.Mode ?? "regex").Trim().ToLowerInvariant();
+            if (mode is not ("regex" or "literal"))
+                return Results.BadRequest("'mode' must be 'regex' or 'literal'.");
+
+            var maxFiles = Math.Clamp(request.MaxFiles <= 0 ? 300 : request.MaxFiles, 1, 5000);
+            var maxMatches = Math.Clamp(request.MaxMatches <= 0 ? 300 : request.MaxMatches, 1, 20000);
+            var maxLineLength = Math.Clamp(request.MaxLineLength <= 0 ? 240 : request.MaxLineLength, 40, 4000);
+
+            Regex? regex = null;
+            if (mode == "regex")
+            {
+                var opts = RegexOptions.Compiled;
+                if (request.IgnoreCase) opts |= RegexOptions.IgnoreCase;
+                if (request.MultiLine) opts |= RegexOptions.Multiline;
+                try { regex = new Regex(request.Pattern, opts, TimeSpan.FromMilliseconds(250)); }
+                catch (Exception ex) { return Results.BadRequest($"Invalid regex: {ex.Message}"); }
+            }
+
+            var comparison = request.IgnoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            var files = (await cache.GetAllFilesAsync(proj.Name, ct))
+                .Where(f => PathMatchesProject(proj.Config.ResolvedPath, f.FilePath, request.PathPrefix))
+                .Take(maxFiles)
+                .ToList();
+
+            var hits = new List<CompactRgHit>(capacity: Math.Min(maxMatches, 512));
+            foreach (var f in files)
+            {
+                if (!File.Exists(f.FilePath)) continue;
+                var lines = await File.ReadAllLinesAsync(f.FilePath, ct);
+                for (var i = 0; i < lines.Length; i++)
+                {
+                    var line = lines[i];
+                    var col = 0;
+                    if (mode == "regex")
+                    {
+                        var match = regex!.Match(line);
+                        if (!match.Success) continue;
+                        col = match.Index + 1;
+                    }
+                    else
+                    {
+                        var idx = line.IndexOf(request.Pattern, comparison);
+                        if (idx < 0) continue;
+                        col = idx + 1;
+                    }
+
+                    hits.Add(new CompactRgHit(f.FilePath, i + 1, col, Truncate(line.Trim(), maxLineLength)));
+                    if (hits.Count >= maxMatches) break;
+                }
+                if (hits.Count >= maxMatches) break;
+            }
+
+            var response = new CompactRgResponse(proj.Name, mode, request.Pattern, hits.Count, hits);
+            telemetry.Record("/api/compact/rg", mode, proj.Name, sw.ElapsedMilliseconds, hits.Count, hits.Count == 0, false, EstimateTokens(hits));
+
+            if (string.Equals(request.Format?.Trim(), "tuple", StringComparison.OrdinalIgnoreCase))
+                return Results.Ok(CompactTupleCodec.FromRg(response));
+            return Results.Ok(response);
         });
 
         g.MapPost("/replace-plan", async (
@@ -138,6 +213,15 @@ public static class CompactOpsEndpoints
             var (project, error) = ResolveProject(projects, request.Project);
             if (error is not null) return error;
             var outcome = fsService.Tree(project!, request);
+            if (!outcome.Ok)
+            {
+                return outcome.ErrorKind switch
+                {
+                    FsErrorKind.BadRequest => Results.BadRequest(outcome.ErrorMessage ?? "Invalid request."),
+                    FsErrorKind.NotFound => Results.NotFound(outcome.ErrorMessage ?? "Directory not found."),
+                    _ => Results.BadRequest(outcome.ErrorMessage ?? "fs/tree failed.")
+                };
+            }
             return Results.Ok(outcome.Response);
         });
 
@@ -160,6 +244,88 @@ public static class CompactOpsEndpoints
                 };
             }
             return Results.Ok(outcome.Response);
+        });
+
+        g.MapPost("/fs/read-many", async (
+            CompactFsReadManyRequest request,
+            ProjectRegistry projects,
+            ICompactFsService fsService,
+            CancellationToken ct) =>
+        {
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+            if (request.Paths is null || request.Paths.Count == 0)
+                return Results.BadRequest("'paths' is required.");
+
+            var maxFiles = Math.Clamp(request.MaxFiles <= 0 ? 80 : request.MaxFiles, 1, 400);
+            var from = request.From <= 0 ? 1 : request.From;
+            var to = request.To <= 0 ? from + 200 : request.To;
+
+            if (string.Equals(request.Format?.Trim(), "raw-lossless", StringComparison.OrdinalIgnoreCase))
+            {
+                var payload = await BuildRawLosslessPayloadAsync(project!, request.Paths, maxFiles, ct);
+                return Results.File(payload, "application/octet-stream");
+            }
+            if (string.Equals(request.Format?.Trim(), "raw-ordered", StringComparison.OrdinalIgnoreCase))
+            {
+                var payload = await BuildRawOrderedPayloadAsync(project!, request.Paths, maxFiles, ct);
+                return Results.File(payload, "application/octet-stream");
+            }
+
+            var files = new List<CompactFsReadRangeResponse>(capacity: Math.Min(request.Paths.Count, maxFiles));
+            foreach (var path in request.Paths.Where(p => !string.IsNullOrWhiteSpace(p)).Take(maxFiles))
+            {
+                var one = new CompactFsReadRangeRequest(request.Project, path, from, to, request.Format);
+                var outcome = await fsService.ReadRangeAsync(project!, one, ct);
+                if (outcome.Ok && outcome.Response is not null)
+                    files.Add(outcome.Response);
+            }
+
+            if (string.Equals(request.Format?.Trim(), "tuple", StringComparison.OrdinalIgnoreCase))
+                return Results.Ok(CompactTupleCodec.FromFsReadMany(request.Project, from, to, files));
+
+            return Results.Ok(new CompactFsReadManyResponse(request.Project, files.Count, files));
+        });
+
+        g.MapPost("/fs/read-spans", async (
+            CompactFsReadSpansRequest request,
+            ProjectRegistry projects,
+            CancellationToken ct) =>
+        {
+            var (project, error) = ResolveProject(projects, request.Project);
+            if (error is not null) return error;
+            if (request.Spans is null || request.Spans.Count == 0)
+                return Results.BadRequest("'spans' is required.");
+
+            var maxSpans = Math.Clamp(request.MaxSpans <= 0 ? 120 : request.MaxSpans, 1, 1000);
+            var maxLinesPerSpan = Math.Clamp(request.MaxLinesPerSpan <= 0 ? 220 : request.MaxLinesPerSpan, 1, 1200);
+            var chunks = new List<CompactFsSpanChunk>(capacity: Math.Min(maxSpans, request.Spans.Count));
+            var root = project!.Config.ResolvedPath;
+
+            foreach (var span in request.Spans.Where(s => !string.IsNullOrWhiteSpace(s.Path)).Take(maxSpans))
+            {
+                ct.ThrowIfCancellationRequested();
+                var full = ProjectPathHelper.EnsureWithinProject(root, span.Path);
+                if (full is null || !File.Exists(full))
+                    continue;
+
+                var from = Math.Max(1, span.From <= 0 ? 1 : span.From);
+                var to = Math.Max(from, span.To <= 0 ? from + 80 : span.To);
+                to = Math.Min(to, from + maxLinesPerSpan - 1);
+
+                var lines = await File.ReadAllLinesAsync(full, ct);
+                if (lines.Length == 0) continue;
+
+                var actualTo = Math.Min(to, lines.Length);
+                if (from > actualTo) continue;
+                var text = string.Join('\n', lines[(from - 1)..actualTo]);
+                chunks.Add(new CompactFsSpanChunk(full, from, actualTo, text));
+            }
+
+            if (string.Equals(request.Format?.Trim(), "tuple", StringComparison.OrdinalIgnoreCase))
+                return Results.Ok(CompactTupleCodec.FromFsReadSpans(request.Project, chunks));
+
+            return Results.Ok(new CompactFsReadSpansResponse(request.Project, chunks.Count, chunks));
         });
 
         g.MapPost("/fs/write-file", (
@@ -222,7 +388,7 @@ public static class CompactOpsEndpoints
                     continue;
                 }
 
-                var full = EnsureWithinProject(project!.Config.ResolvedPath, op.Path);
+                var full = ProjectPathHelper.EnsureWithinProject(project!.Config.ResolvedPath, op.Path);
                 if (full is null || !File.Exists(full))
                 {
                     results.Add(new CompactPatchOpResult(op.Path, false, "file not found or outside project root", 0));
@@ -406,7 +572,7 @@ public static class CompactOpsEndpoints
                 return Results.BadRequest("'seed' is required.");
 
             var filePath = request.Seed.Type?.Equals("file", StringComparison.OrdinalIgnoreCase) == true
-                ? NormalizeFileSeed(request.Seed.Path ?? request.Seed.Id)
+                ? CompactSearchEngine.NormalizeFileSeed(request.Seed.Path ?? request.Seed.Id)
                 : null;
 
             var proj = project!;
@@ -469,7 +635,7 @@ public static class CompactOpsEndpoints
             if (string.IsNullOrWhiteSpace(q) && request.Seed is null)
                 return Results.BadRequest("'q' or 'seed' is required.");
 
-            var tokens = Tokenize(q);
+            var tokens = CompactSearchEngine.Tokenize(q);
             if (request.Seed?.Name is { Length: > 0 }) tokens.Add(request.Seed.Name);
             tokens = [.. tokens.Distinct(StringComparer.OrdinalIgnoreCase)];
 
@@ -631,9 +797,7 @@ public static class CompactOpsEndpoints
         g.MapPost("/reindex", async (
             CompactReindexRequest request,
             ProjectRegistry projects,
-            ICodeMapCache cache,
-            ICodeIndexer indexer,
-            IFileScanner scanner,
+            Application.Reindex.ICompactReindexService reindexService,
             QueryTelemetry telemetry,
             CancellationToken ct) =>
         {
@@ -642,101 +806,25 @@ public static class CompactOpsEndpoints
             if (error is not null) return error;
 
             var proj = project!;
-            var root = proj.Config.ResolvedPath;
-            var extensions = proj.Languages.SupportedExtensions;
-            var maxFiles = Math.Clamp(request.MaxFiles <= 0 ? 5000 : request.MaxFiles, 1, 50000);
-
-            var mode = "project";
-            var indexed = 0;
-            var removed = 0;
-            var skipped = 0;
-            var failed = 0;
-            var targetPath = request.Path;
 
             try
             {
-                if (string.IsNullOrWhiteSpace(request.Path))
-                {
-                    if (request.PruneStale)
-                        removed += await PruneMissingIndexedFilesAsync(cache, indexer, proj, null, ct);
-
-                    await indexer.IndexRepoAsync(proj.Config, ct);
-                    indexed = (await cache.GetAllFilesAsync(proj.Name, ct)).Count();
-                }
-                else
-                {
-                    var scope = EnsureWithinProject(root, request.Path!);
-                    if (scope is null)
-                        return Results.BadRequest("Path is outside project root.");
-
-                    if (File.Exists(scope))
-                    {
-                        mode = "file";
-                        if (!await scanner.ShouldIndexAsync(root, scope, extensions, ct))
-                        {
-                            skipped = 1;
-                        }
-                        else
-                        {
-                            await indexer.IndexFileAsync(proj.Name, scope, ct);
-                            indexed = 1;
-                        }
-                        targetPath = Path.GetRelativePath(root, scope);
-                    }
-                    else if (Directory.Exists(scope))
-                    {
-                        mode = "directory";
-                        if (request.PruneStale)
-                            removed += await PruneMissingIndexedFilesAsync(cache, indexer, proj, scope, ct);
-
-                        await foreach (var file in scanner.GetFilesAsync(scope, extensions, ct))
-                        {
-                            if (indexed >= maxFiles) break;
-                            if (!await scanner.ShouldIndexAsync(root, file, extensions, ct))
-                            {
-                                skipped++;
-                                continue;
-                            }
-
-                            try
-                            {
-                                await indexer.IndexFileAsync(proj.Name, file, ct);
-                                indexed++;
-                            }
-                            catch
-                            {
-                                failed++;
-                            }
-                        }
-                        targetPath = Path.GetRelativePath(root, scope);
-                    }
-                    else
-                    {
-                        return Results.NotFound("Path not found.");
-                    }
-                }
+                var response = await reindexService.RunAsync(proj, request, ct);
+                telemetry.Record("/api/compact/reindex", response.Mode, proj.Name, sw.ElapsedMilliseconds, response.Indexed, response.Indexed == 0, false, 0);
+                return Results.Ok(response);
             }
             catch (OperationCanceledException)
             {
                 throw;
             }
+            catch (FileNotFoundException)
+            {
+                return Results.NotFound("Path not found.");
+            }
             catch (Exception ex)
             {
-                telemetry.Record("/api/compact/reindex", mode, proj.Name, sw.ElapsedMilliseconds, indexed, indexed == 0, false, 0);
                 return Results.BadRequest($"reindex failed: {ex.Message}");
             }
-
-            telemetry.Record("/api/compact/reindex", mode, proj.Name, sw.ElapsedMilliseconds, indexed, indexed == 0, false, 0);
-            return Results.Ok(new CompactReindexResponse(
-                proj.Name,
-                mode,
-                targetPath,
-                indexed,
-                removed,
-                skipped,
-                failed,
-                request.PruneStale,
-                sw.ElapsedMilliseconds));
         });
 
         g.MapPost("/dev/serve", (
@@ -748,7 +836,7 @@ public static class CompactOpsEndpoints
             if (error is not null) return error;
 
             var root = project!.Config.ResolvedPath;
-            var dirPath = string.IsNullOrWhiteSpace(request.Path) ? root : EnsureWithinProject(root, request.Path!);
+            var dirPath = string.IsNullOrWhiteSpace(request.Path) ? root : ProjectPathHelper.EnsureWithinProject(root, request.Path!);
             if (dirPath is null) return Results.BadRequest("Path is outside project root.");
             if (!Directory.Exists(dirPath)) return Results.NotFound("Directory not found.");
 
@@ -841,7 +929,7 @@ public static class CompactOpsEndpoints
                 return Results.BadRequest("'q' is required.");
 
             var q = request.Q.Trim();
-            var tokens = Tokenize(q);
+            var tokens = CompactSearchEngine.Tokenize(q);
             var candidates = new Dictionary<string, (CodeSymbol S, int Score)>(StringComparer.OrdinalIgnoreCase);
             foreach (var t in tokens.Take(16))
             {
@@ -977,25 +1065,14 @@ public static class CompactOpsEndpoints
     {
         var q = request.Q.Trim();
         var limit = Math.Clamp(request.Limit <= 0 ? 12 : request.Limit, 1, 40);
-        var stage = "exact";
-        var items = await RunExactInline(cache, request.Project, q, limit, ct);
-        if (items.Count == 0)
-        {
-            stage = "fuzzy";
-            items = await RunFuzzyInline(cache, request.Project, q, limit, ct);
-        }
-        if (items.Count == 0)
-        {
-            stage = "snippet";
-            items = await RunSnippetInline(cache, request.Project, q, limit, ct);
-        }
+        var (stage, items) = await CompactSearchEngine.ResolveBestEffortAsync(cache, request.Project, q, limit, ct);
         return new CompactResolveResponse
         {
             Project = request.Project,
             Q = q,
             Stage = stage,
             Count = items.Count,
-            Tokens = EstimateTokens(items),
+            Tokens = CompactSearchEngine.EstimateCompactTokens(items),
             Items = items
         };
     }
@@ -1006,25 +1083,15 @@ public static class CompactOpsEndpoints
         var tokenBudget = Math.Clamp(request.TokenBudget <= 0 ? 600 : request.TokenBudget, 200, 4000);
         var maxItems = Math.Clamp(request.MaxItems <= 0 ? 30 : request.MaxItems, 5, 80);
         var previousIds = request.PreviousIds?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
-
-        var items = await RunFuzzyInline(cache, request.Project, q, maxItems, ct);
-        if ((request.Mode ?? "").Equals("impact", StringComparison.OrdinalIgnoreCase))
-        {
-            var refs = await RunReferencesInline(cache, request.Project, q, maxItems, ct);
-            foreach (var x in refs)
-            {
-                if (items.Any(i => i.Id == x.Id && i.P == x.P && i.L == x.L)) continue;
-                items.Add(x);
-                if (items.Count >= maxItems) break;
-            }
-        }
+        var mode = (request.Mode ?? "fuzzy").Trim().ToLowerInvariant();
+        var items = await CompactSearchEngine.ExpandWithReferencesForImpactAsync(cache, request.Project, q, maxItems, mode, ct);
 
         var packed = new List<CompactItem>();
         var used = 0;
         foreach (var i in items)
         {
             if (previousIds.Contains(i.Id)) continue;
-            var est = EstimateTokens([i]);
+            var est = CompactSearchEngine.EstimateCompactTokens([i]);
             if (used + est > tokenBudget) break;
             used += est;
             packed.Add(i);
@@ -1053,55 +1120,98 @@ public static class CompactOpsEndpoints
         return (project, null);
     }
 
-    private static async Task<int> PruneMissingIndexedFilesAsync(
-        ICodeMapCache cache,
-        ICodeIndexer indexer,
-        Project project,
-        string? scopePath,
-        CancellationToken ct)
-    {
-        var removed = 0;
-        var indexedFiles = await cache.GetAllFilesAsync(project.Name, ct);
-        foreach (var file in indexedFiles)
-        {
-            if (scopePath is not null && !IsPathWithin(file.FilePath, scopePath))
-                continue;
-            if (File.Exists(file.FilePath))
-                continue;
-
-            await indexer.RemoveFileAsync(project.Name, file.FilePath, ct);
-            removed++;
-        }
-        return removed;
-    }
-
-    private static bool IsPathWithin(string filePath, string scopePath)
-    {
-        var fullFile = Path.GetFullPath(filePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var fullScope = Path.GetFullPath(scopePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return fullFile.Equals(fullScope, StringComparison.OrdinalIgnoreCase)
-               || fullFile.StartsWith(fullScope + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-               || fullFile.StartsWith(fullScope + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-    }
-
     private static bool PathMatches(string path, string? prefix)
         => string.IsNullOrWhiteSpace(prefix)
            || path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
            || path.Contains(prefix, StringComparison.OrdinalIgnoreCase);
 
+    private static bool PathMatchesProject(string projectRoot, string filePath, string? prefix)
+    {
+        if (string.IsNullOrWhiteSpace(prefix)) return true;
+        if (PathMatches(filePath, prefix)) return true;
+
+        var normalizedPrefix = prefix.Trim().Replace('\\', '/').TrimStart('/');
+        if (string.IsNullOrWhiteSpace(normalizedPrefix)) return true;
+
+        var relativePath = Path.GetRelativePath(projectRoot, filePath).Replace('\\', '/');
+        return relativePath.StartsWith(normalizedPrefix, StringComparison.OrdinalIgnoreCase)
+            || relativePath.Contains(normalizedPrefix, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool ShouldExclude(RepoConfig config, string path)
         => config.ExcludePaths.Any(x => path.Contains($"{Path.DirectorySeparatorChar}{x}{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
             || path.EndsWith($"{Path.DirectorySeparatorChar}{x}", StringComparison.OrdinalIgnoreCase));
 
-    private static string? EnsureWithinProject(string projectRoot, string inputPath)
+    private static async Task<byte[]> BuildRawLosslessPayloadAsync(Project project, IEnumerable<string> requestedPaths, int maxFiles, CancellationToken ct)
     {
-        var full = Path.GetFullPath(Path.IsPathRooted(inputPath) ? inputPath : Path.Combine(projectRoot, inputPath));
-        var rootBase = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar);
-        var rootPrefix = rootBase + Path.DirectorySeparatorChar;
-        return full.Equals(rootBase, StringComparison.OrdinalIgnoreCase)
-            || full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)
-            ? full
-            : null;
+        using var ms = new MemoryStream(capacity: 64 * 1024);
+        using var writer = new StreamWriter(ms, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), leaveOpen: true);
+        writer.NewLine = "\n";
+        writer.WriteLine("LLENS_RAW_LOSSLESS_V1");
+        writer.WriteLine($"PROJECT {project.Name}");
+        writer.Flush();
+
+        var root = project.Config.ResolvedPath;
+        var count = 0;
+        foreach (var path in requestedPaths.Where(p => !string.IsNullOrWhiteSpace(p)).Take(maxFiles))
+        {
+            ct.ThrowIfCancellationRequested();
+            var full = ProjectPathHelper.EnsureWithinProject(root, path);
+            if (full is null || !File.Exists(full))
+                continue;
+
+            var fileBytes = await File.ReadAllBytesAsync(full, ct);
+            var rel = Path.GetRelativePath(root, full).Replace('\\', '/');
+            var relBytes = Encoding.UTF8.GetBytes(rel);
+            var sha = Convert.ToHexString(SHA256.HashData(fileBytes)).ToLowerInvariant();
+
+            writer.WriteLine($"F path-bytes={relBytes.Length} bytes={fileBytes.Length} sha256={sha}");
+            writer.Flush();
+
+            ms.Write(relBytes, 0, relBytes.Length);
+            ms.WriteByte((byte)'\n');
+            ms.Write(fileBytes, 0, fileBytes.Length);
+            ms.WriteByte((byte)'\n');
+            count++;
+        }
+
+        writer.WriteLine($"END files={count}");
+        writer.Flush();
+        return ms.ToArray();
+    }
+
+    private static async Task<byte[]> BuildRawOrderedPayloadAsync(Project project, IEnumerable<string> requestedPaths, int maxFiles, CancellationToken ct)
+    {
+        var root = project.Config.ResolvedPath;
+        var blobs = new List<byte[]>(capacity: Math.Min(maxFiles, 128));
+        foreach (var path in requestedPaths.Where(p => !string.IsNullOrWhiteSpace(p)).Take(maxFiles))
+        {
+            ct.ThrowIfCancellationRequested();
+            var full = ProjectPathHelper.EnsureWithinProject(root, path);
+            if (full is null || !File.Exists(full))
+                continue;
+            blobs.Add(await File.ReadAllBytesAsync(full, ct));
+        }
+
+        using var ms = new MemoryStream(capacity: 64 * 1024);
+        using var writer = new StreamWriter(ms, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), leaveOpen: true);
+        writer.NewLine = "\n";
+        writer.WriteLine("LLENS_RAW_ORDERED_V1");
+        writer.WriteLine($"PROJECT {project.Name}");
+        writer.WriteLine($"FILES {blobs.Count}");
+        writer.Flush();
+
+        foreach (var blob in blobs)
+        {
+            writer.WriteLine($"B {blob.Length}");
+            writer.Flush();
+            ms.Write(blob, 0, blob.Length);
+            ms.WriteByte((byte)'\n');
+        }
+
+        writer.WriteLine("END");
+        writer.Flush();
+        return ms.ToArray();
     }
 
     private static async Task<FileNode?> ResolveIndexedFileNodeAsync(ICodeMapCache cache, Project project, string seedPath, CancellationToken ct)
@@ -1116,7 +1226,7 @@ public static class CompactOpsEndpoints
             }
         }
 
-        var rooted = EnsureWithinProject(project.Config.ResolvedPath, seedPath);
+        var rooted = ProjectPathHelper.EnsureWithinProject(project.Config.ResolvedPath, seedPath);
         if (!string.IsNullOrWhiteSpace(rooted))
         {
             if (ShouldExclude(project.Config, rooted!))
@@ -1136,17 +1246,17 @@ public static class CompactOpsEndpoints
             if (byRooted is not null) return byRooted;
         }
 
-        var normalizedSeed = NormalizePathForMatch(seedPath);
-        var normalizedRelative = NormalizePathForMatch(seedPath.TrimStart('.', '/', '\\'));
+        var normalizedSeed = ProjectPathHelper.NormalizePathForMatch(seedPath);
+        var normalizedRelative = ProjectPathHelper.NormalizePathForMatch(seedPath.TrimStart('.', '/', '\\'));
         var seedFileName = Path.GetFileName(seedPath);
         var candidates = all
             .Select(f =>
             {
                 var score = 0;
-                var fp = NormalizePathForMatch(f.FilePath);
+                var fp = ProjectPathHelper.NormalizePathForMatch(f.FilePath);
                 if (!string.IsNullOrWhiteSpace(rooted))
                 {
-                    var rootedNorm = NormalizePathForMatch(rooted!);
+                    var rootedNorm = ProjectPathHelper.NormalizePathForMatch(rooted!);
                     if (fp == rootedNorm) score += 100;
                 }
                 if (fp == normalizedSeed || fp.EndsWith("/" + normalizedSeed, StringComparison.OrdinalIgnoreCase)) score += 80;
@@ -1161,9 +1271,6 @@ public static class CompactOpsEndpoints
 
         return candidates.FirstOrDefault().Node;
     }
-
-    private static string NormalizePathForMatch(string path)
-        => path.Replace('\\', '/').Trim();
 
     private static string Truncate(string s, int n)
         => s.Length <= n ? s : s[..n];
@@ -1230,108 +1337,6 @@ public static class CompactOpsEndpoints
         return "\"" + value.Replace("\"", "\\\"") + "\"";
     }
 
-    private static string MergeProcessOutput(string stdout, string stderr, int maxChars)
-    {
-        var text = string.IsNullOrWhiteSpace(stderr)
-            ? stdout ?? ""
-            : string.IsNullOrWhiteSpace(stdout)
-                ? stderr
-                : stdout + "\n" + stderr;
-        return text.Length <= maxChars ? text : text[..maxChars];
-    }
-
-    private static (string File, string Args, string Kind)? ResolveTestCommand(string root, string target, string? filter)
-    {
-        static string BuildDotnetTestArgs(string? value)
-        {
-            var args = "test -v minimal --nologo";
-            if (!string.IsNullOrWhiteSpace(value))
-                args += " --filter " + QuoteArg(value);
-            return args;
-        }
-
-        static string BuildCargoTestArgs(string? value)
-        {
-            var args = "test";
-            if (!string.IsNullOrWhiteSpace(value))
-                args += " " + QuoteArg(value);
-            return args;
-        }
-
-        static string BuildNodeTestArgs(string? value)
-        {
-            var args = "--test";
-            if (!string.IsNullOrWhiteSpace(value))
-                args += " " + QuoteArg(value);
-            return args;
-        }
-
-        return target switch
-        {
-            "dotnet" => ("dotnet", BuildDotnetTestArgs(filter), "dotnet"),
-            "cargo" => ("cargo", BuildCargoTestArgs(filter), "cargo"),
-            "node" => ("node", BuildNodeTestArgs(filter), "node"),
-            _ => File.Exists(Path.Combine(root, "Cargo.toml"))
-                ? ("cargo", BuildCargoTestArgs(filter), "cargo")
-                : File.Exists(Path.Combine(root, "package.json"))
-                    ? ("node", BuildNodeTestArgs(filter), "node")
-                    : HasDotnetProject(root)
-                        ? ("dotnet", BuildDotnetTestArgs(filter), "dotnet")
-                        : null
-        };
-    }
-
-    private static (string File, string Args, string Kind)? ResolveFormatCommand(string root, string target, bool checkOnly, string? path)
-    {
-        var fullPath = string.IsNullOrWhiteSpace(path) ? null : EnsureWithinProject(root, path!);
-        var relativePath = fullPath is null ? null : Path.GetRelativePath(root, fullPath);
-
-        static string BuildDotnetFormatArgs(bool verifyNoChanges, string? includePath)
-        {
-            var args = "format --verbosity minimal";
-            if (verifyNoChanges) args += " --verify-no-changes";
-            if (!string.IsNullOrWhiteSpace(includePath))
-                args += " --include " + QuoteArg(includePath);
-            return args;
-        }
-
-        static string BuildCargoFmtArgs(bool check, string? includePath)
-        {
-            var args = "fmt --all";
-            if (check) args += " -- --check";
-            if (!string.IsNullOrWhiteSpace(includePath))
-                args = "fmt --all";
-            return args;
-        }
-
-        static string BuildNodeFormatArgs(bool check, string? includePath)
-        {
-            var targetPath = string.IsNullOrWhiteSpace(includePath) ? "." : includePath;
-            return check
-                ? "exec prettier -- --check " + QuoteArg(targetPath)
-                : "exec prettier -- --write " + QuoteArg(targetPath);
-        }
-
-        return target switch
-        {
-            "dotnet" => ("dotnet", BuildDotnetFormatArgs(checkOnly, relativePath), "dotnet"),
-            "cargo" => ("cargo", BuildCargoFmtArgs(checkOnly, relativePath), "cargo"),
-            "node" => ("npm", BuildNodeFormatArgs(checkOnly, relativePath), "node"),
-            _ => File.Exists(Path.Combine(root, "Cargo.toml"))
-                ? ("cargo", BuildCargoFmtArgs(checkOnly, relativePath), "cargo")
-                : File.Exists(Path.Combine(root, "package.json"))
-                    ? ("npm", BuildNodeFormatArgs(checkOnly, relativePath), "node")
-                    : HasDotnetProject(root)
-                        ? ("dotnet", BuildDotnetFormatArgs(checkOnly, relativePath), "dotnet")
-                        : null
-        };
-    }
-
-    private static bool HasDotnetProject(string root)
-        => Directory.EnumerateFiles(root, "*.sln", SearchOption.TopDirectoryOnly).Any()
-           || Directory.EnumerateFiles(root, "*.csproj", SearchOption.TopDirectoryOnly).Any()
-           || Directory.EnumerateFiles(root, "*.fsproj", SearchOption.TopDirectoryOnly).Any();
-
     private static (Process Process, string Command) StartPythonServer(string cwd, string host, int port, bool preferPython3)
     {
         var file = preferPython3 ? "python3" : "python";
@@ -1393,7 +1398,7 @@ public static class CompactOpsEndpoints
             return (gitRoot, relRoot);
         }
 
-        var full = EnsureWithinProject(root, requestedPath);
+        var full = ProjectPathHelper.EnsureWithinProject(root, requestedPath);
         if (full is null) return null;
         var rel = Path.GetRelativePath(gitRoot, full);
         return (gitRoot, rel);
@@ -1581,7 +1586,7 @@ public static class CompactOpsEndpoints
 
     private static async Task<CompactGraphNode?> ResolveSymbolSeedAsync(ICodeMapCache cache, string project, GraphSeed seed, CancellationToken ct)
     {
-        var normalizedId = NormalizeSymbolSeed(seed.Id);
+        var normalizedId = CompactSearchEngine.NormalizeSymbolSeed(seed.Id);
         if (!string.IsNullOrWhiteSpace(normalizedId))
         {
             var all = await cache.QueryByNameAsync("", project, ct);
@@ -1593,7 +1598,7 @@ public static class CompactOpsEndpoints
         if (string.IsNullOrWhiteSpace(q)) return null;
         var byName = await cache.QueryByNameAsync(q, project, ct);
         var best = byName
-            .OrderByDescending(s => ScoreSymbol(s, q, Tokenize(q)))
+            .OrderByDescending(s => CompactSearchEngine.ScoreSymbol(s, q, CompactSearchEngine.Tokenize(q)))
             .ThenBy(s => s.FilePath, StringComparer.OrdinalIgnoreCase)
             .ThenBy(s => s.LineStart)
             .FirstOrDefault();
@@ -1617,105 +1622,8 @@ public static class CompactOpsEndpoints
     private static CompactGraphNode ToNode(CodeSymbol s)
         => new($"symbol:{s.Id}", "s", s.Name, s.FilePath, 0, s.Kind.ToString(), s.Id, s.LineStart);
 
-    private static string? NormalizeSymbolSeed(string? seedId)
-    {
-        if (string.IsNullOrWhiteSpace(seedId)) return null;
-        return seedId.StartsWith("symbol:", StringComparison.OrdinalIgnoreCase)
-            ? seedId["symbol:".Length..]
-            : seedId;
-    }
-
-    private static string? NormalizeFileSeed(string? seedPath)
-    {
-        if (string.IsNullOrWhiteSpace(seedPath)) return null;
-        return seedPath.StartsWith("file:", StringComparison.OrdinalIgnoreCase)
-            ? seedPath["file:".Length..]
-            : seedPath;
-    }
-
-    private static int ScoreSymbol(CodeSymbol symbol, string query, IReadOnlyList<string> tokens)
-    {
-        var score = 0;
-        if (symbol.Name.Equals(query, StringComparison.OrdinalIgnoreCase)) score += 100;
-        else if (symbol.Name.StartsWith(query, StringComparison.OrdinalIgnoreCase)) score += 70;
-        else if (symbol.Name.Contains(query, StringComparison.OrdinalIgnoreCase)) score += 50;
-        foreach (var token in tokens)
-        {
-            if (symbol.Name.Contains(token, StringComparison.OrdinalIgnoreCase)) score += 12;
-            if (!string.IsNullOrWhiteSpace(symbol.Signature) && symbol.Signature.Contains(token, StringComparison.OrdinalIgnoreCase)) score += 6;
-            if (symbol.FilePath.Contains(token, StringComparison.OrdinalIgnoreCase)) score += 3;
-        }
-        return score;
-    }
-
-    private static List<string> Tokenize(string query)
-        => query
-            .Split([' ', '\t', '\r', '\n', '.', ':', '/', '\\', '-', '_', '(', ')', '[', ']', '{', '}', ','], StringSplitOptions.RemoveEmptyEntries)
-            .Select(t => t.Trim())
-            .Where(t => t.Length >= 2)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
     private static int EstimateTokens<T>(IEnumerable<T> items)
         => Math.Max(1, items.Sum(x => x?.ToString()?.Length ?? 0) / 4);
-
-    private static async Task<List<CompactItem>> RunExactInline(ICodeMapCache cache, string project, string q, int limit, CancellationToken ct)
-    {
-        var hits = await cache.QueryByNameAsync(q, project, ct);
-        return [.. hits.Where(s => s.Name.Equals(q, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(s => s.FilePath, StringComparer.OrdinalIgnoreCase)
-            .Take(limit)
-            .Select(s => new CompactItem($"symbol:{s.Id}", "s", s.Name, s.FilePath, s.LineStart, s.Kind.ToString(), 200))];
-    }
-
-    private static async Task<List<CompactItem>> RunFuzzyInline(ICodeMapCache cache, string project, string q, int limit, CancellationToken ct)
-    {
-        var tokens = Tokenize(q);
-        if (tokens.Count == 0) tokens = [q];
-        var scored = new Dictionary<string, (CodeSymbol S, int Score)>(StringComparer.OrdinalIgnoreCase);
-        foreach (var t in tokens.Take(12))
-        {
-            var hits = await cache.QueryByNameAsync(t, project, ct);
-            foreach (var s in hits.Take(200))
-            {
-                var score = ScoreSymbol(s, q, tokens);
-                if (score <= 0) continue;
-                if (!scored.TryGetValue(s.Id, out var prev) || score > prev.Score)
-                    scored[s.Id] = (s, score);
-            }
-        }
-        return [.. scored.Values.OrderByDescending(x => x.Score).ThenBy(x => x.S.Name, StringComparer.OrdinalIgnoreCase)
-            .Take(limit)
-            .Select(x => new CompactItem($"symbol:{x.S.Id}", "s", x.S.Name, x.S.FilePath, x.S.LineStart, x.S.Kind.ToString(), x.Score))];
-    }
-
-    private static async Task<List<CompactItem>> RunSnippetInline(ICodeMapCache cache, string project, string q, int limit, CancellationToken ct)
-    {
-        var files = await cache.GetAllFilesAsync(project, ct);
-        var items = new List<CompactItem>(capacity: limit);
-        foreach (var f in files)
-        {
-            if (!File.Exists(f.FilePath)) continue;
-            var lines = await File.ReadAllLinesAsync(f.FilePath, ct);
-            for (var i = 0; i < lines.Length; i++)
-            {
-                if (!lines[i].Contains(q, StringComparison.OrdinalIgnoreCase)) continue;
-                items.Add(new CompactItem($"file:{f.FilePath}:{i + 1}", "m", Path.GetFileName(f.FilePath), f.FilePath, i + 1, f.Language, 1));
-                if (items.Count >= limit) return items;
-            }
-        }
-        return items;
-    }
-
-    private static async Task<List<CompactItem>> RunReferencesInline(ICodeMapCache cache, string project, string q, int limit, CancellationToken ct)
-    {
-        var symbols = await cache.QueryByNameAsync(q, project, ct);
-        var selected = symbols.OrderByDescending(s => ScoreSymbol(s, q, Tokenize(q))).FirstOrDefault();
-        if (selected is null) return [];
-        var refs = await cache.QueryReferencesAsync(selected.Id, project, ct);
-        return [.. refs.Take(limit).Select(r => new CompactItem($"ref:{selected.Id}:{r.InFilePath}:{r.Line}", "r", selected.Name, r.InFilePath, r.Line, "ref", 1))];
-    }
 }
 
 public sealed class CompactSessionStore
@@ -1790,6 +1698,21 @@ public sealed class CompactDevServerStore
 public record CompactRegexRequest(string Project, string Pattern, string? PathPrefix = null, bool IgnoreCase = true, bool MultiLine = false, int MaxFiles = 200, int MaxMatches = 250);
 public record CompactRegexMatch(string P, int L, string M);
 public record CompactRegexResponse(string Project, string Pattern, int Count, List<CompactRegexMatch> Matches);
+public class CompactRgRequest
+{
+    public string Project { get; init; } = "";
+    public string Pattern { get; init; } = "";
+    public string? PathPrefix { get; init; }
+    public string Mode { get; init; } = "regex"; // regex | literal
+    public bool IgnoreCase { get; init; } = true;
+    public bool MultiLine { get; init; }
+    public int MaxFiles { get; init; } = 300;
+    public int MaxMatches { get; init; } = 300;
+    public int MaxLineLength { get; init; } = 240;
+    public string? Format { get; init; } // tuple
+}
+public record CompactRgHit(string P, int L, int C, string T);
+public record CompactRgResponse(string Project, string Mode, string Pattern, int Count, List<CompactRgHit> Hits);
 
 public class CompactReplacePlanRequest
 {
@@ -1806,13 +1729,19 @@ public record CompactReplacePlannedMatch(int Line, int Count, string Preview);
 public record CompactReplacePlannedFile(string Path, int Total, List<CompactReplacePlannedMatch> Matches);
 public record CompactReplacePlanResponse(string Project, string Mode, string Find, string Replace, int Total, List<CompactReplacePlannedFile> Files);
 
-public record CompactFsTreeRequest(string Project, int MaxDepth = 3, int MaxEntries = 600);
+public record CompactFsTreeRequest(string Project, string? Path = null, int MaxDepth = 3, int MaxEntries = 600);
 public record CompactFsEntry(string T, string P, int D);
 public record CompactFsTreeResponse(string Project, string Root, int Count, List<CompactFsEntry> Entries);
 
-public record CompactFsReadRangeRequest(string Project, string Path, int From, int To);
+public record CompactFsReadRangeRequest(string Project, string Path, int From, int To, string? Format = null);
 public record CompactLine(int L, string T);
 public record CompactFsReadRangeResponse(string Path, int From, int To, List<CompactLine> Lines);
+public record CompactFsReadManyRequest(string Project, List<string> Paths, int From = 1, int To = 4000, int MaxFiles = 80, string? Format = null);
+public record CompactFsReadManyResponse(string Project, int Count, List<CompactFsReadRangeResponse> Files);
+public record CompactFsSpan(string Path, int From, int To);
+public record CompactFsReadSpansRequest(string Project, List<CompactFsSpan> Spans, int MaxSpans = 120, int MaxLinesPerSpan = 220, string? Format = null);
+public record CompactFsSpanChunk(string Path, int From, int To, string Text);
+public record CompactFsReadSpansResponse(string Project, int Count, List<CompactFsSpanChunk> Chunks);
 
 public class CompactFsWriteFileRequest
 {

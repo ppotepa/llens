@@ -142,6 +142,119 @@ public static class CompactTupleCodec
         };
     }
 
+    public static CompactTupleEnvelope FromFsReadMany(string project, int from, int to, List<CompactFsReadRangeResponse> files)
+    {
+        var paths = files
+            .Select(f => f.Path)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var rows = files
+            .Select(f => (IReadOnlyList<object?>)
+            [
+                IndexOf(paths, f.Path),
+                string.Join('\n', f.Lines.Select(l => l.T))
+            ])
+            .ToList();
+
+        return new CompactTupleEnvelope
+        {
+            V = "2",
+            Format = "tuple",
+            Schema = "compact.fs-read-many",
+            Dict = new Dictionary<string, List<string>>
+            {
+                ["p"] = paths
+            },
+            Meta = new Dictionary<string, object?>
+            {
+                ["project"] = project,
+                ["from"] = from,
+                ["to"] = to,
+                ["count"] = files.Count
+            },
+            Columns = ["p", "t"],
+            Items = rows
+        };
+    }
+
+    public static CompactTupleEnvelope FromFsReadSpans(string project, List<CompactFsSpanChunk> chunks)
+    {
+        var paths = chunks
+            .Select(c => c.Path)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var rows = chunks
+            .Select(c => (IReadOnlyList<object?>)
+            [
+                IndexOf(paths, c.Path),
+                c.From,
+                c.To,
+                c.Text
+            ])
+            .ToList();
+
+        return new CompactTupleEnvelope
+        {
+            V = "2",
+            Format = "tuple",
+            Schema = "compact.fs-read-spans",
+            Dict = new Dictionary<string, List<string>>
+            {
+                ["p"] = paths
+            },
+            Meta = new Dictionary<string, object?>
+            {
+                ["project"] = project,
+                ["count"] = chunks.Count
+            },
+            Columns = ["p", "from", "to", "t"],
+            Items = rows
+        };
+    }
+
+    public static CompactTupleEnvelope FromRg(CompactRgResponse response)
+    {
+        var paths = response.Hits
+            .Select(h => h.P)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var rows = response.Hits
+            .Select(h => (IReadOnlyList<object?>)
+            [
+                IndexOf(paths, h.P),
+                h.L,
+                h.C,
+                h.T
+            ])
+            .ToList();
+
+        return new CompactTupleEnvelope
+        {
+            V = "2",
+            Format = "tuple",
+            Schema = "compact.rg",
+            Dict = new Dictionary<string, List<string>>
+            {
+                ["p"] = paths
+            },
+            Meta = new Dictionary<string, object?>
+            {
+                ["project"] = response.Project,
+                ["mode"] = response.Mode,
+                ["pattern"] = response.Pattern,
+                ["count"] = response.Count
+            },
+            Columns = ["p", "l", "c", "t"],
+            Items = rows
+        };
+    }
+
     private static (List<string> Paths, List<string> Kinds) BuildCommonDict(List<CompactItem> items)
     {
         var paths = items.Select(i => i.P).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Llens.Api;
 using Llens.Models;
+using Llens.Shared;
 
 namespace Llens.Application.Fs;
 
@@ -8,7 +9,14 @@ public sealed class CompactFsService : ICompactFsService
 {
     public CompactFsTreeOutcome Tree(Project project, CompactFsTreeRequest request)
     {
-        var root = project.Config.ResolvedPath;
+        var projectRoot = project.Config.ResolvedPath;
+        var root = string.IsNullOrWhiteSpace(request.Path)
+            ? projectRoot
+            : ProjectPathHelper.EnsureWithinProject(projectRoot, request.Path!);
+        if (root is null)
+            return new CompactFsTreeOutcome(false, ErrorKind: FsErrorKind.BadRequest, ErrorMessage: "Path is outside project root.");
+        if (!Directory.Exists(root))
+            return new CompactFsTreeOutcome(false, ErrorKind: FsErrorKind.NotFound, ErrorMessage: "Directory not found.");
         var maxDepth = Math.Clamp(request.MaxDepth <= 0 ? 3 : request.MaxDepth, 1, 10);
         var maxEntries = Math.Clamp(request.MaxEntries <= 0 ? 600 : request.MaxEntries, 1, 20000);
         var entries = new List<CompactFsEntry>();
@@ -54,7 +62,7 @@ public sealed class CompactFsService : ICompactFsService
         if (string.IsNullOrWhiteSpace(request.Path))
             return new CompactFsReadRangeOutcome(false, ErrorKind: FsErrorKind.BadRequest, ErrorMessage: "'path' is required.");
 
-        var full = EnsureWithinProject(project.Config.ResolvedPath, request.Path);
+        var full = ProjectPathHelper.EnsureWithinProject(project.Config.ResolvedPath, request.Path);
         if (full is null)
             return new CompactFsReadRangeOutcome(false, ErrorKind: FsErrorKind.BadRequest, ErrorMessage: "Path is outside project root.");
         if (!File.Exists(full))
@@ -80,7 +88,7 @@ public sealed class CompactFsService : ICompactFsService
         if (string.IsNullOrWhiteSpace(request.Path))
             return new CompactFsWriteFileOutcome(false, ErrorKind: FsErrorKind.BadRequest, ErrorMessage: "'path' is required.");
 
-        var full = EnsureWithinProject(project.Config.ResolvedPath, request.Path);
+        var full = ProjectPathHelper.EnsureWithinProject(project.Config.ResolvedPath, request.Path);
         if (full is null)
             return new CompactFsWriteFileOutcome(false, ErrorKind: FsErrorKind.BadRequest, ErrorMessage: "Path is outside project root.");
 
@@ -122,7 +130,7 @@ public sealed class CompactFsService : ICompactFsService
                 continue;
             }
 
-            var full = EnsureWithinProject(project.Config.ResolvedPath, op.Path);
+            var full = ProjectPathHelper.EnsureWithinProject(project.Config.ResolvedPath, op.Path);
             if (full is null || !File.Exists(full))
             {
                 results.Add(new CompactFsEditOpResult(op.Path, op.Type ?? "unknown", false, "file not found or outside project root", 0, 0, 0));
@@ -171,7 +179,7 @@ public sealed class CompactFsService : ICompactFsService
         if (request.Staged) args.Add("--cached");
         if (!string.IsNullOrWhiteSpace(request.Path))
         {
-            var full = EnsureWithinProject(root, request.Path!);
+            var full = ProjectPathHelper.EnsureWithinProject(root, request.Path!);
             if (full is null)
                 return new CompactFsDiffOutcome(false, ErrorKind: FsErrorKind.BadRequest, ErrorMessage: "Path is outside project root.");
             var rel = Path.GetRelativePath(gitRoot, full);
@@ -191,7 +199,7 @@ public sealed class CompactFsService : ICompactFsService
 
         if (string.IsNullOrWhiteSpace(text) && !string.IsNullOrWhiteSpace(request.Path))
         {
-            var full = EnsureWithinProject(root, request.Path!);
+            var full = ProjectPathHelper.EnsureWithinProject(root, request.Path!);
             if (full is not null)
             {
                 var rel = Path.GetRelativePath(gitRoot, full);
@@ -224,7 +232,7 @@ public sealed class CompactFsService : ICompactFsService
 
         if (!string.IsNullOrWhiteSpace(request.Path))
         {
-            var full = EnsureWithinProject(root, request.Path!);
+            var full = ProjectPathHelper.EnsureWithinProject(root, request.Path!);
             if (full is null)
                 return new CompactGitStatusOutcome(false, ErrorKind: FsErrorKind.BadRequest, ErrorMessage: "Path is outside project root.");
             var rel = Path.GetRelativePath(gitRoot, full);
@@ -281,17 +289,6 @@ public sealed class CompactFsService : ICompactFsService
     private static bool ShouldExclude(RepoConfig config, string path)
         => config.ExcludePaths.Any(x => path.Contains($"{Path.DirectorySeparatorChar}{x}{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
             || path.EndsWith($"{Path.DirectorySeparatorChar}{x}", StringComparison.OrdinalIgnoreCase));
-
-    private static string? EnsureWithinProject(string projectRoot, string inputPath)
-    {
-        var full = Path.GetFullPath(Path.IsPathRooted(inputPath) ? inputPath : Path.Combine(projectRoot, inputPath));
-        var rootBase = Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar);
-        var rootPrefix = rootBase + Path.DirectorySeparatorChar;
-        return full.Equals(rootBase, StringComparison.OrdinalIgnoreCase)
-            || full.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)
-            ? full
-            : null;
-    }
 
     private static async Task<(int ExitCode, string Stdout, string Stderr)> RunProcessAsync(string file, string args, string cwd, int timeoutMs, CancellationToken ct)
     {
