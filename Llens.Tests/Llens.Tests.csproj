@@ -11,10 +11,23 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Llens.csproj" />
+    <ProjectReference Include="..\Llens.Bench\Llens.Bench.csproj" />
+    <ProjectReference Include="..\Llens.Abstractions\Llens.Abstractions.csproj" />
+    <ProjectReference Include="..\Llens.Language.CSharp\Llens.Language.CSharp.csproj" />
+    <ProjectReference Include="..\Llens.Language.Rust\Llens.Language.Rust.csproj" />
+  </ItemGroup>
+
+  <!-- Fixture files are copied to output so tests can reference them by path.
+       C# fixtures are excluded from compilation — they are read as text, not compiled. -->
+  <ItemGroup>
+    <Compile Remove="Fixtures/**/*.cs" />
+    <None Include="Fixtures/**/*.cs" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures/**/*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

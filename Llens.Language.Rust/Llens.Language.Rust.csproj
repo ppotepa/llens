@@ -8,13 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Llens.Core\Llens.Core.csproj" />
+    <ProjectReference Include="..\Llens.Abstractions\Llens.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="Rust/**/*.cs" />
-    <Compile Include="Tools/**/*.cs" />
-    <Compile Include="Indexing/**/*.cs" />
+    <Compile Include="Capabilities/**/*.cs" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,706 @@
+{
+  "name": "agent-rust-csharp-history-100",
+  "repo": "Llens.Bench/generated/synth-repo-100",
+  "tasks": [
+    {
+      "id": "latest.cs.001",
+      "title": "Latest touch for feature_001.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m01\\feature_001.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.002",
+      "title": "First touch for feature_002.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m02\\feature_002.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.003",
+      "title": "Touch count for feature_011.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m01\\feature_011.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.004",
+      "title": "Latest touch for feature_012.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m02\\feature_012.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.005",
+      "title": "First touch for feature_021.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m01\\feature_021.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.006",
+      "title": "Touch count for feature_022.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m02\\feature_022.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.007",
+      "title": "Latest touch for feature_031.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m01\\feature_031.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.008",
+      "title": "First touch for feature_032.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m02\\feature_032.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.009",
+      "title": "Touch count for feature_041.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m01\\feature_041.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.010",
+      "title": "Latest touch for feature_042.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m02\\feature_042.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.011",
+      "title": "First touch for feature_051.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m01\\feature_051.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.012",
+      "title": "Touch count for feature_052.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m02\\feature_052.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.013",
+      "title": "Latest touch for feature_061.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m01\\feature_061.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.014",
+      "title": "First touch for feature_062.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m02\\feature_062.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.015",
+      "title": "Touch count for feature_071.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m01\\feature_071.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.016",
+      "title": "Latest touch for feature_072.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m02\\feature_072.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.017",
+      "title": "First touch for feature_081.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m01\\feature_081.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.018",
+      "title": "Touch count for feature_082.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m02\\feature_082.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.019",
+      "title": "Latest touch for feature_091.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m01\\feature_091.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.020",
+      "title": "First touch for feature_092.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m02\\feature_092.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.021",
+      "title": "Touch count for feature_006.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m06\\feature_006.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.022",
+      "title": "Latest touch for feature_007.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m07\\feature_007.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.023",
+      "title": "First touch for feature_016.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m06\\feature_016.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.024",
+      "title": "Touch count for feature_017.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m07\\feature_017.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.025",
+      "title": "Latest touch for feature_026.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m06\\feature_026.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.026",
+      "title": "First touch for feature_027.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m07\\feature_027.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.027",
+      "title": "Touch count for feature_036.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m06\\feature_036.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.028",
+      "title": "Latest touch for feature_037.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m07\\feature_037.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.029",
+      "title": "First touch for feature_046.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m06\\feature_046.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.030",
+      "title": "Touch count for feature_047.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m07\\feature_047.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.031",
+      "title": "Latest touch for feature_056.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m06\\feature_056.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.032",
+      "title": "First touch for feature_057.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m07\\feature_057.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.033",
+      "title": "Touch count for feature_066.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m06\\feature_066.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.034",
+      "title": "Latest touch for feature_067.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m07\\feature_067.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.035",
+      "title": "First touch for feature_076.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m06\\feature_076.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.036",
+      "title": "Touch count for feature_077.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m07\\feature_077.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.037",
+      "title": "Latest touch for feature_086.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m06\\feature_086.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.038",
+      "title": "First touch for feature_087.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m07\\feature_087.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.039",
+      "title": "Touch count for feature_096.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m06\\feature_096.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.040",
+      "title": "Latest touch for feature_097.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m07\\feature_097.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.041",
+      "title": "First touch for feature_001.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m01\\feature_001.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.042",
+      "title": "Touch count for feature_002.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m02\\feature_002.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.043",
+      "title": "Latest touch for feature_011.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m01\\feature_011.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.044",
+      "title": "First touch for feature_012.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m02\\feature_012.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.045",
+      "title": "Touch count for feature_021.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m01\\feature_021.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.046",
+      "title": "Latest touch for feature_022.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m02\\feature_022.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.047",
+      "title": "First touch for feature_031.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m01\\feature_031.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.048",
+      "title": "Touch count for feature_032.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m02\\feature_032.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.049",
+      "title": "Latest touch for feature_041.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m01\\feature_041.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.050",
+      "title": "First touch for feature_042.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m02\\feature_042.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.051",
+      "title": "Touch count for feature_051.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m01\\feature_051.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.052",
+      "title": "Latest touch for feature_052.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m02\\feature_052.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.053",
+      "title": "First touch for feature_061.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m01\\feature_061.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.054",
+      "title": "Touch count for feature_062.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m02\\feature_062.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.055",
+      "title": "Latest touch for feature_071.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m01\\feature_071.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.056",
+      "title": "First touch for feature_072.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m02\\feature_072.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.057",
+      "title": "Touch count for feature_081.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m01\\feature_081.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.058",
+      "title": "Latest touch for feature_082.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m02\\feature_082.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.059",
+      "title": "First touch for feature_091.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m01\\feature_091.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.060",
+      "title": "Touch count for feature_092.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m02\\feature_092.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.061",
+      "title": "Latest touch for feature_006.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m06\\feature_006.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.062",
+      "title": "First touch for feature_007.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m07\\feature_007.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.063",
+      "title": "Touch count for feature_016.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m06\\feature_016.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.064",
+      "title": "Latest touch for feature_017.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m07\\feature_017.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.065",
+      "title": "First touch for feature_026.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m06\\feature_026.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.066",
+      "title": "Touch count for feature_027.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m07\\feature_027.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.067",
+      "title": "Latest touch for feature_036.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m06\\feature_036.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.068",
+      "title": "First touch for feature_037.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m07\\feature_037.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.069",
+      "title": "Touch count for feature_046.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m06\\feature_046.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.070",
+      "title": "Latest touch for feature_047.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m07\\feature_047.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.071",
+      "title": "First touch for feature_056.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m06\\feature_056.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.072",
+      "title": "Touch count for feature_057.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m07\\feature_057.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.073",
+      "title": "Latest touch for feature_066.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m06\\feature_066.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.074",
+      "title": "First touch for feature_067.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m07\\feature_067.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.075",
+      "title": "Touch count for feature_076.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m06\\feature_076.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.076",
+      "title": "Latest touch for feature_077.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m07\\feature_077.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.077",
+      "title": "First touch for feature_086.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m06\\feature_086.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.078",
+      "title": "Touch count for feature_087.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m07\\feature_087.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.079",
+      "title": "Latest touch for feature_096.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m06\\feature_096.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.080",
+      "title": "First touch for feature_097.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m07\\feature_097.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.081",
+      "title": "Touch count for feature_001.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m01\\feature_001.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.082",
+      "title": "Latest touch for feature_002.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m02\\feature_002.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.083",
+      "title": "First touch for feature_011.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m01\\feature_011.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.084",
+      "title": "Touch count for feature_012.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m02\\feature_012.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.085",
+      "title": "Latest touch for feature_021.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m01\\feature_021.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.086",
+      "title": "First touch for feature_022.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m02\\feature_022.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.087",
+      "title": "Touch count for feature_031.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m01\\feature_031.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.088",
+      "title": "Latest touch for feature_032.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m02\\feature_032.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.089",
+      "title": "First touch for feature_041.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m01\\feature_041.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.090",
+      "title": "Touch count for feature_042.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m02\\feature_042.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.091",
+      "title": "Latest touch for feature_051.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m01\\feature_051.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.092",
+      "title": "First touch for feature_052.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m02\\feature_052.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.093",
+      "title": "Touch count for feature_061.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m01\\feature_061.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.094",
+      "title": "Latest touch for feature_062.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m02\\feature_062.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.cs.095",
+      "title": "First touch for feature_071.cs",
+      "kind": "history_first_touch",
+      "path": "src\\csharp\\m01\\feature_071.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.rs.096",
+      "title": "Touch count for feature_072.rs",
+      "kind": "history_touch_count",
+      "path": "src\\rust\\m02\\feature_072.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.cs.097",
+      "title": "Latest touch for feature_081.cs",
+      "kind": "history_latest_touch",
+      "path": "src\\csharp\\m01\\feature_081.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "first.rs.098",
+      "title": "First touch for feature_082.rs",
+      "kind": "history_first_touch",
+      "path": "src\\rust\\m02\\feature_082.rs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "count.cs.099",
+      "title": "Touch count for feature_091.cs",
+      "kind": "history_touch_count",
+      "path": "src\\csharp\\m01\\feature_091.cs",
+      "note": "agent-history-ops"
+    },
+    {
+      "id": "latest.rs.100",
+      "title": "Latest touch for feature_092.rs",
+      "kind": "history_latest_touch",
+      "path": "src\\rust\\m02\\feature_092.rs",
+      "note": "agent-history-ops"
+    }
+  ]
+}

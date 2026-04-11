@@ -1,11 +1,10 @@
-using Llens.Tools;
-
 namespace Llens.Languages;
 
 /// <summary>
-/// Per-project registry. All lookups are O(1) via dictionary — no linear scans.
+/// Per-project registry of language handlers. Implements <see cref="ILanguageRegistry"/>.
+/// All lookups are O(1) via dictionary — no linear scans.
 /// </summary>
-public class LanguageRegistry
+public class LanguageRegistry : ILanguageRegistry
 {
     private readonly IReadOnlyDictionary<LanguageId, ILanguage> _byId;
     private readonly IReadOnlyDictionary<string, ILanguage> _byExtension;
@@ -28,10 +27,6 @@ public class LanguageRegistry
     /// <summary>Resolve language by id — O(1).</summary>
     public ILanguage? Resolve(LanguageId id)
         => _byId.TryGetValue(id, out var lang) ? lang : null;
-
-    /// <summary>Resolve the first tool covering a capability for a given file path.</summary>
-    public ITool? ResolveTool(string filePath, ToolCapability capability)
-        => Resolve(filePath)?.GetTool(capability);
 
     public IReadOnlyList<ILanguage> All => [.. _byId.Values];
     public HashSet<string> SupportedExtensions { get; }

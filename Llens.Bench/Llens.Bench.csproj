@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>llens-bench</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.49.1" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Llens.Abstractions\Llens.Abstractions.csproj" />
+    <ProjectReference Include="..\Llens.Language.CSharp\Llens.Language.CSharp.csproj" />
+    <ProjectReference Include="..\Llens.Language.Rust\Llens.Language.Rust.csproj" />
+  </ItemGroup>
+
+  <!-- Share fixture files with Llens.Tests — copied to output for path-based loading -->
+  <ItemGroup>
+    <None Include="..\Llens.Tests\Fixtures\**\*"
+          Link="Fixtures\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Synthetic generated repos may contain .cs files and must never be compiled
+       as part of the benchmark executable itself. -->
+  <ItemGroup>
+    <Compile Remove="generated\**\*.cs" />
+  </ItemGroup>
+
+</Project>

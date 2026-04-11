@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1680" height="1040" viewBox="0 0 1680 1040" role="img" aria-labelledby="title desc">
+  <title id="title">Llens Test Explorer Windows Maquette</title>
+  <desc id="desc">Windows desktop maquette for a token-saving test explorer. The design keeps the test catalog visible, shows classic versus compact versus hybrid comparison, and moves verbose details into local tabs for the selected test only.</desc>
+
+  <defs>
+    <linearGradient id="windowBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f7f4ec" />
+      <stop offset="100%" stop-color="#ece7dc" />
+    </linearGradient>
+    <linearGradient id="headerBg" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#24353f" />
+      <stop offset="100%" stop-color="#355361" />
+    </linearGradient>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#25313a" flood-opacity="0.12" />
+    </filter>
+    <style>
+      .ui { font-family: "Segoe UI", Tahoma, sans-serif; fill: #223037; }
+      .mono { font-family: Consolas, "Courier New", monospace; fill: #26353d; }
+      .title { font-size: 20px; font-weight: 700; letter-spacing: 0.2px; }
+      .subtitle { font-size: 11px; fill: #677881; }
+      .cardTitle { font-size: 13px; font-weight: 700; fill: #203038; }
+      .label { font-size: 11px; fill: #66767f; }
+      .value { font-size: 12px; fill: #1c2e35; }
+      .tableHead { font-size: 11px; font-weight: 700; fill: #51656e; }
+      .small { font-size: 10px; fill: #677881; }
+      .chipText { font-size: 10px; font-weight: 700; }
+      .tabText { font-size: 11px; font-weight: 700; }
+    </style>
+  </defs>
+
+  <rect x="0" y="0" width="1680" height="1040" fill="url(#windowBg)" />
+  <rect x="22" y="18" width="1636" height="1002" rx="18" fill="#fbfaf7" stroke="#d8d1c4" filter="url(#softShadow)" />
+
+  <rect x="22" y="18" width="1636" height="36" rx="18" fill="url(#headerBg)" />
+  <rect x="22" y="36" width="1636" height="18" fill="url(#headerBg)" />
+  <circle cx="46" cy="36" r="6" fill="#ff8b6a" />
+  <circle cx="66" cy="36" r="6" fill="#f6c96b" />
+  <circle cx="86" cy="36" r="6" fill="#7bcf87" />
+  <text class="ui title" x="112" y="41" fill="#f6f2eb">Llens Test Explorer</text>
+  <text class="ui subtitle" x="320" y="41" fill="#d9e4ea">Compare token-saving tooling against classic LLM workflows</text>
+  <text class="ui subtitle" x="1380" y="41" fill="#d9e4ea">Run: 2026-04-11 17:37 UTC | SQLite attached</text>
+
+  <rect x="40" y="74" width="1600" height="86" rx="14" fill="#ffffff" stroke="#ddd5c8" filter="url(#softShadow)" />
+  <text class="ui cardTitle" x="60" y="100">Run Console</text>
+
+  <text class="ui label" x="60" y="125">Task Pack</text>
+  <rect x="122" y="111" width="440" height="24" rx="8" fill="#f6f2ea" stroke="#d7cfbf" />
+  <text class="mono small" x="136" y="126">Llens.Bench/TaskPacks/agent-rust-csharp-history-100.tasks.json</text>
+
+  <text class="ui label" x="590" y="125">SQLite</text>
+  <rect x="636" y="111" width="330" height="24" rx="8" fill="#f6f2ea" stroke="#d7cfbf" />
+  <text class="mono small" x="650" y="126">Llens.Bench/out-gui/bench-results.db</text>
+
+  <text class="ui label" x="990" y="125">Search</text>
+  <rect x="1038" y="111" width="180" height="24" rx="8" fill="#fcfbf8" stroke="#d7cfbf" />
+  <text class="ui small" x="1052" y="126">history latest rust</text>
+
+  <rect x="1246" y="108" width="84" height="28" rx="10" fill="#204f67" />
+  <text class="ui chipText" x="1268" y="126" fill="#ffffff">Run All</text>
+  <rect x="1340" y="108" width="106" height="28" rx="10" fill="#2f6f56" />
+  <text class="ui chipText" x="1358" y="126" fill="#ffffff">Run Selected</text>
+  <rect x="1456" y="108" width="88" height="28" rx="10" fill="#eadfbf" />
+  <text class="ui chipText" x="1479" y="126" fill="#4c4a36">Load Latest</text>
+  <rect x="1552" y="108" width="70" height="28" rx="10" fill="#ece7dc" stroke="#d7cfbf" />
+  <text class="ui chipText" x="1570" y="126" fill="#42525b">Open</text>
+
+  <text class="ui small" x="60" y="149">Preset filters: All | Selected | Smoke | Token Savings | Regressions</text>
+  <text class="ui small" x="410" y="149">Rule: keep the test list visible at all times; move noisy detail into local tabs only.</text>
+
+  <rect x="40" y="184" width="280" height="820" rx="14" fill="#ffffff" stroke="#ddd5c8" filter="url(#softShadow)" />
+  <text class="ui cardTitle" x="60" y="212">Catalog</text>
+  <rect x="58" y="226" width="244" height="26" rx="8" fill="#f6f2ea" stroke="#d7cfbf" />
+  <text class="ui small" x="72" y="243">Filter tree + saved views</text>
+
+  <rect x="56" y="270" width="248" height="28" rx="8" fill="#e7f3ef" stroke="#b5d5c5" />
+  <text class="ui value" x="74" y="288">All Tests (100)</text>
+
+  <text class="ui label" x="60" y="324">By Goal</text>
+  <text class="ui value" x="76" y="346">Token Savings</text>
+  <text class="ui value" x="76" y="366">Latency</text>
+  <text class="ui value" x="76" y="386">Correctness</text>
+  <text class="ui value" x="76" y="406">Determinism</text>
+
+  <text class="ui label" x="60" y="442">By Tooling</text>
+  <text class="ui value" x="76" y="464">History / Git</text>
+  <text class="ui value" x="76" y="484">Search / Grep</text>
+  <text class="ui value" x="76" y="504">Resolve / Symbol</text>
+  <text class="ui value" x="76" y="524">Workflow / E2E</text>
+
+  <text class="ui label" x="60" y="560">By Language</text>
+  <text class="ui value" x="76" y="582">CSharp</text>
+  <text class="ui value" x="76" y="602">Rust</text>
+  <text class="ui value" x="76" y="622">Mixed</text>
+
+  <text class="ui label" x="60" y="658">Smart Views</text>
+  <text class="ui value" x="76" y="680">Savings Winners</text>
+  <text class="ui value" x="76" y="700">Regressions</text>
+  <text class="ui value" x="76" y="720">Flaky</text>
+  <text class="ui value" x="76" y="740">Needs Review</text>
+
+  <rect x="56" y="790" width="248" height="184" rx="10" fill="#f8f5ee" stroke="#ded6c7" />
+  <text class="ui cardTitle" x="72" y="816">Why This Layout</text>
+  <text class="ui small" x="72" y="842">1. Explorer stays visible.</text>
+  <text class="ui small" x="72" y="862">2. Run selected is one click.</text>
+  <text class="ui small" x="72" y="882">3. Compare is always side-by-side.</text>
+  <text class="ui small" x="72" y="902">4. Trace and raw IO are local tabs,</text>
+  <text class="ui small" x="88" y="918">not global navigation.</text>
+  <text class="ui small" x="72" y="946">5. The app is about saving LLM tokens,</text>
+  <text class="ui small" x="88" y="962">so deltas are first-class columns.</text>
+
+  <rect x="338" y="184" width="838" height="490" rx="14" fill="#ffffff" stroke="#ddd5c8" filter="url(#softShadow)" />
+  <text class="ui cardTitle" x="358" y="212">Scenario List</text>
+  <text class="ui small" x="503" y="212">Primary view: scan, sort, multi-select, run selected</text>
+
+  <rect x="356" y="232" width="802" height="34" rx="8" fill="#f5f1e7" stroke="#ddd5c8" />
+  <text class="ui tableHead" x="372" y="253">Scenario</text>
+  <text class="ui tableHead" x="560" y="253">Goal</text>
+  <text class="ui tableHead" x="645" y="253">Lang</text>
+  <text class="ui tableHead" x="715" y="253">Classic</text>
+  <text class="ui tableHead" x="792" y="253">Compact</text>
+  <text class="ui tableHead" x="877" y="253">Hybrid</text>
+  <text class="ui tableHead" x="955" y="253">Delta</text>
+  <text class="ui tableHead" x="1015" y="253">Savings</text>
+  <text class="ui tableHead" x="1096" y="253">Pass</text>
+
+  <rect x="356" y="274" width="802" height="36" rx="8" fill="#ebf6ef" stroke="#d1e6d7" />
+  <text class="mono value" x="372" y="297">latest.cs.001</text>
+  <text class="ui value" x="560" y="297">History</text>
+  <text class="ui value" x="645" y="297">CSharp</text>
+  <text class="ui value" x="720" y="297">81</text>
+  <text class="ui value" x="800" y="297">10</text>
+  <text class="ui value" x="882" y="297">10</text>
+  <text class="ui value" x="957" y="297">+71</text>
+  <text class="ui value" x="1015" y="297">87.7%</text>
+  <rect x="1090" y="282" width="50" height="18" rx="9" fill="#2d8f5d" />
+  <text class="ui chipText" x="1102" y="295" fill="#ffffff">PASS</text>
+
+  <rect x="356" y="316" width="802" height="36" rx="8" fill="#ffffff" stroke="#ece5d8" />
+  <text class="mono value" x="372" y="339">first.rs.022</text>
+  <text class="ui value" x="560" y="339">History</text>
+  <text class="ui value" x="645" y="339">Rust</text>
+  <text class="ui value" x="720" y="339">51</text>
+  <text class="ui value" x="800" y="339">10</text>
+  <text class="ui value" x="882" y="339">10</text>
+  <text class="ui value" x="957" y="339">+41</text>
+  <text class="ui value" x="1015" y="339">80.4%</text>
+  <rect x="1090" y="324" width="50" height="18" rx="9" fill="#2d8f5d" />
+  <text class="ui chipText" x="1102" y="337" fill="#ffffff">PASS</text>
+
+  <rect x="356" y="358" width="802" height="36" rx="8" fill="#fff9ef" stroke="#eee0b7" />
+  <text class="mono value" x="372" y="381">grep.rs.014</text>
+  <text class="ui value" x="560" y="381">Search</text>
+  <text class="ui value" x="645" y="381">Rust</text>
+  <text class="ui value" x="720" y="381">240</text>
+  <text class="ui value" x="800" y="381">42</text>
+  <text class="ui value" x="882" y="381">58</text>
+  <text class="ui value" x="957" y="381">+198</text>
+  <text class="ui value" x="1015" y="381">82.5%</text>
+  <rect x="1090" y="366" width="50" height="18" rx="9" fill="#bb8e2b" />
+  <text class="ui chipText" x="1100" y="379" fill="#ffffff">WARN</text>
+
+  <rect x="356" y="400" width="802" height="36" rx="8" fill="#ffffff" stroke="#ece5d8" />
+  <text class="mono value" x="372" y="423">symbol.cs.044</text>
+  <text class="ui value" x="560" y="423">Resolve</text>
+  <text class="ui value" x="645" y="423">CSharp</text>
+  <text class="ui value" x="720" y="423">118</text>
+  <text class="ui value" x="800" y="423">34</text>
+  <text class="ui value" x="882" y="423">36</text>
+  <text class="ui value" x="957" y="423">+84</text>
+  <text class="ui value" x="1015" y="423">71.2%</text>
+  <rect x="1090" y="408" width="50" height="18" rx="9" fill="#2d8f5d" />
+  <text class="ui chipText" x="1102" y="421" fill="#ffffff">PASS</text>
+
+  <rect x="356" y="442" width="802" height="36" rx="8" fill="#fff2ef" stroke="#efc7bf" />
+  <text class="mono value" x="372" y="465">workflow.rs.067</text>
+  <text class="ui value" x="560" y="465">Workflow</text>
+  <text class="ui value" x="645" y="465">Rust</text>
+  <text class="ui value" x="720" y="465">74</text>
+  <text class="ui value" x="800" y="465">82</text>
+  <text class="ui value" x="882" y="465">40</text>
+  <text class="ui value" x="957" y="465">-8</text>
+  <text class="ui value" x="1015" y="465">-10.8%</text>
+  <rect x="1090" y="450" width="50" height="18" rx="9" fill="#c45a4e" />
+  <text class="ui chipText" x="1098" y="463" fill="#ffffff">REG</text>
+
+  <rect x="356" y="496" width="802" height="146" rx="10" fill="#f8f5ee" stroke="#ded6c7" />
+  <text class="ui cardTitle" x="374" y="522">List Design Notes</text>
+  <text class="ui small" x="374" y="548">- The table is the dominant view because the user needs selection, ranking, and bulk runs.</text>
+  <text class="ui small" x="374" y="568">- Token deltas are first-class columns; they are not hidden inside a detail pane.</text>
+  <text class="ui small" x="374" y="588">- Compact and hybrid are always visible next to classic, so tradeoffs are immediate.</text>
+  <text class="ui small" x="374" y="608">- Status badges call out regressions without opening the testcase.</text>
+
+  <rect x="1194" y="184" width="446" height="490" rx="14" fill="#ffffff" stroke="#ddd5c8" filter="url(#softShadow)" />
+  <text class="ui cardTitle" x="1214" y="212">Selected Test Summary</text>
+  <text class="mono value" x="1214" y="240">latest.cs.001</text>
+  <text class="ui label" x="1214" y="260">Goal: replace broad git log output with compact sanitized history answer</text>
+
+  <rect x="1214" y="282" width="124" height="26" rx="13" fill="#ebf6ef" stroke="#d2e6d7" />
+  <text class="ui chipText" x="1244" y="299" fill="#2d6d4e">History</text>
+  <rect x="1348" y="282" width="96" height="26" rx="13" fill="#eef3fb" stroke="#d4dfef" />
+  <text class="ui chipText" x="1375" y="299" fill="#38566a">CSharp</text>
+  <rect x="1454" y="282" width="110" height="26" rx="13" fill="#f5f1e7" stroke="#ded6c7" />
+  <text class="ui chipText" x="1476" y="299" fill="#5f5a46">TokenSavings</text>
+  <rect x="1574" y="282" width="48" height="26" rx="13" fill="#2d8f5d" />
+  <text class="ui chipText" x="1587" y="299" fill="#ffffff">PASS</text>
+
+  <rect x="1214" y="330" width="406" height="88" rx="12" fill="#eef4fb" stroke="#d8e3f0" />
+  <text class="ui cardTitle" x="1232" y="354" fill="#28455a">Classic</text>
+  <text class="ui value" x="1232" y="378">Tokens: 81</text>
+  <text class="ui value" x="1312" y="378">Calls: 1</text>
+  <text class="ui value" x="1380" y="378">Latency: 29 ms</text>
+  <text class="ui small" x="1232" y="402">Broad git log returned multiple hashes and noisy context.</text>
+
+  <rect x="1214" y="432" width="406" height="88" rx="12" fill="#ebf6ef" stroke="#d1e6d7" />
+  <text class="ui cardTitle" x="1232" y="456" fill="#29563f">Compact</text>
+  <text class="ui value" x="1232" y="480">Tokens: 10</text>
+  <text class="ui value" x="1312" y="480">Calls: 1</text>
+  <text class="ui value" x="1380" y="480">Latency: 26 ms</text>
+  <text class="ui small" x="1232" y="504">Sanitized return: only the latest touch hash, no extra lines.</text>
+
+  <rect x="1214" y="534" width="406" height="88" rx="12" fill="#fff6e7" stroke="#ead6a6" />
+  <text class="ui cardTitle" x="1232" y="558" fill="#75521d">Hybrid</text>
+  <text class="ui value" x="1232" y="582">Tokens: 10</text>
+  <text class="ui value" x="1312" y="582">Calls: 1</text>
+  <text class="ui value" x="1380" y="582">Latency: 27 ms</text>
+  <text class="ui small" x="1232" y="606">Compact answer accepted; fallback path not needed.</text>
+
+  <rect x="1214" y="634" width="406" height="24" rx="8" fill="#f7f2e8" stroke="#ddd5c8" />
+  <text class="ui small" x="1230" y="650">Summary strip: Classic 81 -> Compact 10 -> Hybrid 10 | Delta +71 | Savings 87.7%</text>
+
+  <rect x="338" y="692" width="1302" height="312" rx="14" fill="#ffffff" stroke="#ddd5c8" filter="url(#softShadow)" />
+  <text class="ui cardTitle" x="358" y="720">Selected Test Details</text>
+  <text class="ui small" x="500" y="720">Tabs are local to the selected testcase. They do not replace the list view.</text>
+
+  <rect x="356" y="738" width="92" height="28" rx="10" fill="#244b5a" />
+  <text class="ui tabText" x="382" y="757" fill="#ffffff">Compare</text>
+  <rect x="456" y="738" width="76" height="28" rx="10" fill="#efe8d7" />
+  <text class="ui tabText" x="480" y="757" fill="#4f5e67">Trace</text>
+  <rect x="540" y="738" width="78" height="28" rx="10" fill="#efe8d7" />
+  <text class="ui tabText" x="565" y="757" fill="#4f5e67">Raw IO</text>
+  <rect x="626" y="738" width="100" height="28" rx="10" fill="#efe8d7" />
+  <text class="ui tabText" x="650" y="757" fill="#4f5e67">SQL History</text>
+
+  <rect x="356" y="782" width="410" height="198" rx="12" fill="#f4f8fc" stroke="#d8e3f0" />
+  <text class="ui cardTitle" x="376" y="808" fill="#28455a">Classic Request / Return</text>
+  <text class="mono small" x="376" y="832">INPUT</text>
+  <text class="mono small" x="376" y="850">git log --pretty=format:%H -- src/csharp/m01/feature_001.cs</text>
+  <text class="mono small" x="376" y="882">OUTPUT</text>
+  <text class="mono small" x="376" y="900">91f2a1d</text>
+  <text class="mono small" x="376" y="916">50ba2cd</text>
+  <text class="mono small" x="376" y="932">447d8f1</text>
+  <text class="mono small" x="376" y="948">... 5 more hashes ...</text>
+
+  <rect x="784" y="782" width="410" height="198" rx="12" fill="#eef8f1" stroke="#d1e6d7" />
+  <text class="ui cardTitle" x="804" y="808" fill="#29563f">Compact Request / Return</text>
+  <text class="mono small" x="804" y="832">INPUT</text>
+  <text class="mono small" x="804" y="850">git log -n 1 --pretty=format:%H -- src/csharp/m01/feature_001.cs</text>
+  <text class="mono small" x="804" y="882">OUTPUT</text>
+  <text class="mono small" x="804" y="900">91f2a1d</text>
+  <text class="ui small" x="804" y="930">Sanitized single-line return preserves the answer while cutting noise.</text>
+
+  <rect x="1212" y="782" width="410" height="198" rx="12" fill="#fff8ea" stroke="#ead6a6" />
+  <text class="ui cardTitle" x="1232" y="808" fill="#75521d">Hybrid Request / Return</text>
+  <text class="mono small" x="1232" y="832">INPUT</text>
+  <text class="mono small" x="1232" y="850">prefer compact; if invalid, fallback to classic normalization</text>
+  <text class="mono small" x="1232" y="882">OUTPUT</text>
+  <text class="mono small" x="1232" y="900">91f2a1d</text>
+  <text class="ui small" x="1232" y="930">Fallback status: not triggered</text>
+
+  <rect x="40" y="1012" width="1600" height="18" rx="9" fill="#e9e3d6" />
+  <text class="ui small" x="60" y="1024">Maquette intent: one-screen explorer, list-first workflow, local detail tabs, explicit classic/compact/hybrid comparison, traceable token-saving evidence.</text>
+</svg>

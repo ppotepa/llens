@@ -4,3 +4,8 @@ obj/
 *.db
 .vs/
 .idea/
+Llens.Bench/out/
+Llens.Bench/out-ci/
+Llens.Bench/out-*/
+Llens.Bench/generated/
+tools/launcher-tui/target/

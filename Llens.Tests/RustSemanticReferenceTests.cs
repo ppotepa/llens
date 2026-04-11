@@ -1,4 +1,4 @@
-using Llens.Indexing;
+using Llens.Languages;
 using Llens.Languages.Rust;
 using Llens.Models;
 using Xunit;
@@ -29,7 +29,7 @@ public sealed class RustSemanticReferenceTests
             };
 
             var lang = new RustLanguage();
-            var refs = await lang.BuildSemanticReferencesAsync(
+            var refs = await lang.ReferenceResolver!.ResolveAsync(
                 new LanguageReferenceContext(
                     "fixture",
                     filePath,
@@ -74,7 +74,7 @@ public sealed class RustSemanticReferenceTests
             };
 
             var lang = new RustLanguage();
-            var refs = await lang.BuildSemanticReferencesAsync(
+            var refs = await lang.ReferenceResolver!.ResolveAsync(
                 new LanguageReferenceContext(
                     "fixture",
                     filePath,

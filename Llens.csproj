@@ -9,11 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dapper" Version="2.1.35" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.4" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <ProjectReference Include="Llens.Abstractions/Llens.Abstractions.csproj" />
     <ProjectReference Include="Llens.Core/Llens.Core.csproj" />
     <ProjectReference Include="Llens.Language.CSharp/Llens.Language.CSharp.csproj" />
     <ProjectReference Include="Llens.Language.Rust/Llens.Language.Rust.csproj" />
@@ -23,13 +19,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Api/**/*.cs" />
     <Compile Include="Application/**/*.cs" />
-    <Compile Include="Caching/**/*.cs" />
     <Compile Include="Cli/**/*.cs" />
-    <Compile Include="Indexing/**/*.cs" />
-    <Compile Include="Observability/**/*.cs" />
-    <Compile Include="Scanning/**/*.cs" />
-    <Compile Include="Shared/**/*.cs" />
-    <Compile Include="Watching/**/*.cs" />
   </ItemGroup>
 
 </Project>

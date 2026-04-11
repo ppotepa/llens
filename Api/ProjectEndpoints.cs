@@ -20,7 +20,13 @@ public static class ProjectEndpoints
                 {
                     l.Name,
                     l.Extensions,
-                    tools = l.Tools.Select(t => new { capabilities = t.Capabilities.Select(c => c.ToString()) })
+                    capabilities = new[]
+                    {
+                        "SymbolExtraction",
+                        l.ImportResolver   is not null ? "ImportResolution"    : null,
+                        l.UsageExtractor   is not null ? "UsageExtraction"     : null,
+                        l.ReferenceResolver is not null ? "ReferenceResolution" : null,
+                    }.OfType<string>()
                 })
             });
             return Results.Ok(summary);

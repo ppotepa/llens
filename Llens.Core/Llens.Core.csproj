@@ -8,6 +8,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Llens.Abstractions\Llens.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Exposes ILogger<T>, BackgroundService, IConfiguration etc. without pulling in the full Web SDK -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Dapper" Version="2.1.35" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="**/*.cs" Exclude="bin/**;obj/**" />
   </ItemGroup>
 

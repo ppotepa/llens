@@ -1,0 +1,23 @@
+{
+  "name": "synthetic-history-v1",
+  "repo": "Llens.Bench/generated/synth-repo-100",
+  "tasks": [
+    { "id": "latest.cs.001", "kind": "history_latest_touch", "path": "src/csharp/m01/feature_001.cs" },
+    { "id": "latest.rs.002", "kind": "history_latest_touch", "path": "src/rust/m02/feature_002.rs" },
+    { "id": "latest.ts.003", "kind": "history_latest_touch", "path": "src/web/m03/feature_003.ts" },
+    { "id": "latest.md.004", "kind": "history_latest_touch", "path": "docs/m04/note_004.md" },
+    { "id": "latest.json.005", "kind": "history_latest_touch", "path": "configs/m05/cfg_005.json" },
+
+    { "id": "first.cs.011", "kind": "history_first_touch", "path": "src/csharp/m01/feature_011.cs" },
+    { "id": "first.rs.012", "kind": "history_first_touch", "path": "src/rust/m02/feature_012.rs" },
+    { "id": "first.ts.013", "kind": "history_first_touch", "path": "src/web/m03/feature_013.ts" },
+    { "id": "first.md.014", "kind": "history_first_touch", "path": "docs/m04/note_014.md" },
+    { "id": "first.json.015", "kind": "history_first_touch", "path": "configs/m05/cfg_015.json" },
+
+    { "id": "count.cs.021", "kind": "history_touch_count", "path": "src/csharp/m01/feature_021.cs" },
+    { "id": "count.rs.022", "kind": "history_touch_count", "path": "src/rust/m02/feature_022.rs" },
+    { "id": "count.ts.023", "kind": "history_touch_count", "path": "src/web/m03/feature_023.ts" },
+    { "id": "count.md.024", "kind": "history_touch_count", "path": "docs/m04/note_024.md" },
+    { "id": "count.json.025", "kind": "history_touch_count", "path": "configs/m05/cfg_025.json" }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "tasks": [
+    {
+      "name": "API Server",
+      "description": "Run Llens API (dotnet)",
+      "program": "dotnet",
+      "args": ["run", "--project", "Llens.csproj"],
+      "cwd": "."
+    },
+    {
+      "name": "Bench History",
+      "description": "Run history-only benchmark",
+      "program": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "Llens.Bench/Llens.Bench.csproj",
+        "--",
+        "--history-only",
+        "--temperature",
+        "warm",
+        "--repeats",
+        "1",
+        "--repo",
+        "Llens.Bench/generated/synth-repo-100",
+        "--tasks",
+        "Llens.Bench/TaskPacks/synthetic-history.tasks.json",
+        "--out",
+        "Llens.Bench/out-launcher-history"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "Bench Full",
+      "description": "Run complete benchmark suite once",
+      "program": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "Llens.Bench/Llens.Bench.csproj",
+        "--",
+        "--temperature",
+        "warm",
+        "--repeats",
+        "1",
+        "--out",
+        "Llens.Bench/out-launcher-full"
+      ],
+      "cwd": "."
+    },
+    {
+      "name": "Tests",
+      "description": "Run .NET tests",
+      "program": "dotnet",
+      "args": ["test", "Llens.Tests/Llens.Tests.csproj", "-v", "minimal"],
+      "cwd": "."
+    }
+  ]
+}
